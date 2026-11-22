@@ -9,7 +9,16 @@
   :root{
     --bg:#f4f5f7; --karta:#fff; --tekst:#1f2933; --szary:#6b7280;
     --akcent:#2563eb; --akcent2:#1d4ed8; --ramka:#d9dde3; --ok:#15803d; --blad:#b91c1c;
+    --hover:#eef1f5; --wcisn:#dbe7ff; --nad:#eef4ff; --pole:#fafafa; --sz1:#fff; --sz2:#ddd; --przerywana:#9aa5b1;
+    color-scheme:light;
   }
+  :root[data-motyw=ciemny]{
+    --bg:#14171c; --karta:#1e2229; --tekst:#e5e7eb; --szary:#9aa3ae;
+    --akcent:#3b82f6; --akcent2:#60a5fa; --ramka:#343a44; --ok:#4ade80; --blad:#f87171;
+    --hover:#2a3039; --wcisn:#1e3a6b; --nad:#1b2a44; --pole:#171a20; --sz1:#2b3038; --sz2:#3a404a; --przerywana:#4b5563;
+    color-scheme:dark;
+  }
+  #motyw{margin-left:auto;font-size:15px}
   *{box-sizing:border-box}
   body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--tekst)}
   header{display:flex;align-items:center;gap:20px;padding:14px 28px;background:var(--karta);border-bottom:1px solid var(--ramka);position:sticky;top:0;z-index:5}
@@ -17,14 +26,14 @@
   #status{font-size:14px;color:var(--szary)}
   #status.ok{color:var(--ok)} #status.blad{color:var(--blad)}
   main{max-width:1300px;margin:0 auto;padding:22px 28px}
-  #drop{border:2px dashed #9aa5b1;border-radius:14px;background:var(--karta);padding:34px;text-align:center;font-size:17px;color:var(--szary);transition:.15s;cursor:pointer}
-  #drop.nad{border-color:var(--akcent);background:#eef4ff;color:var(--akcent)}
+  #drop{border:2px dashed var(--przerywana);border-radius:14px;background:var(--karta);padding:34px;text-align:center;font-size:17px;color:var(--szary);transition:.15s;cursor:pointer}
+  #drop.nad{border-color:var(--akcent);background:var(--nad);color:var(--akcent)}
   #drop b{color:var(--tekst)}
   button,select{font:inherit;font-size:14px;padding:7px 13px;border-radius:8px;border:1px solid var(--ramka);background:var(--karta);cursor:pointer;color:var(--tekst)}
-  button:hover{background:#eef1f5}
+  button:hover{background:var(--hover)}
   button.glowny{background:var(--akcent);border-color:var(--akcent);color:#fff}
   button.glowny:hover{background:var(--akcent2)}
-  button.wcisniety{background:#dbe7ff;border-color:var(--akcent);color:var(--akcent2);font-weight:600}
+  button.wcisniety{background:var(--wcisn);border-color:var(--akcent);color:var(--akcent2);font-weight:600}
   button:disabled{opacity:.5;cursor:default}
   #opcje{display:flex;flex-wrap:wrap;align-items:center;gap:14px 26px;margin:18px 0;padding:14px 18px;background:var(--karta);border:1px solid var(--ramka);border-radius:12px;font-size:14px}
   #opcje label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
@@ -41,12 +50,12 @@
   .stan{font-size:13px;color:var(--szary)}
   .stan.ok{color:var(--ok)} .stan.blad{color:var(--blad)}
   .obrazy{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .pole{height:260px;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid var(--ramka);background:#fafafa}
-  .szachownica{background-color:#fff;background-image:linear-gradient(45deg,#ddd 25%,transparent 25%),linear-gradient(-45deg,#ddd 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ddd 75%),linear-gradient(-45deg,transparent 75%,#ddd 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0}
+  .pole{height:260px;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid var(--ramka);background:var(--pole)}
+  .szachownica{background-color:var(--sz1);background-image:linear-gradient(45deg,var(--sz2) 25%,transparent 25%),linear-gradient(-45deg,var(--sz2) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,var(--sz2) 75%),linear-gradient(-45deg,transparent 75%,var(--sz2) 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0}
   .pole img,.pole canvas{max-width:100%;max-height:100%;object-fit:contain}
   .wynik canvas{cursor:pointer}
   .podpis{font-size:12px;color:var(--szary);text-align:center;margin-top:4px}
-  .krec{width:34px;height:34px;border:4px solid #cbd2d9;border-top-color:var(--akcent);border-radius:50%;animation:krec 1s linear infinite}
+  .krec{width:34px;height:34px;border:4px solid var(--ramka);border-top-color:var(--akcent);border-radius:50%;animation:krec 1s linear infinite}
   @keyframes krec{to{transform:rotate(360deg)}}
   footer{text-align:center;color:var(--szary);font-size:13px;padding:26px}
 
@@ -66,6 +75,7 @@
 <header>
   <h1>✂️ Usuwanie tła</h1>
   <span id="status">Wczytaj zdjęcie, a model AI uruchomi się sam.</span>
+  <button id="motyw" title="Przełącz jasny / ciemny wygląd">🌙 Noc</button>
 </header>
 
 <main>
@@ -100,6 +110,22 @@
     <div class="grupa">
       <label><input type="checkbox" id="przytnij"> Przytnij do obiektu</label>
       <label>margines <input type="range" id="margines" min="0" max="25" value="5"> <span class="liczba" id="marginesTxt"></span></label>
+    </div>
+    <div class="grupa">
+      <span>Cień:</span>
+      <select id="cien" title="Cień pod wyciętym obiektem">
+        <option value="brak">brak</option>
+        <option value="pod">pod obiektem (stoi na stole)</option>
+        <option value="rzucony">rzucony (z boku)</option>
+      </select>
+      <label id="silaBox">siła <input type="range" id="sila" min="10" max="100" value="60"> <span class="liczba" id="silaTxt"></span></label>
+    </div>
+    <div class="grupa" id="folderBox">
+      <span>Folder:</span>
+      <button id="wybierzFolder" title="Zdjęcia będą zapisywane prosto do tego folderu (np. w OneDrive)">📁 Wybierz folder</button>
+      <span id="folderNazwa" class="liczba">pobieranie do „Downloads”</span>
+      <button id="zapomnijFolder" title="Wróć do zwykłego pobierania" style="display:none">✕</button>
+      <label id="autoZapisBox" style="display:none" title="Każde zdjęcie zapisze się samo, gdy tylko tło zostanie usunięte"><input type="checkbox" id="autoZapis"> zapisuj od razu</label>
     </div>
     <div class="grupa">
       <span>Zapis:</span>
@@ -154,7 +180,29 @@
   <div id="edPomoc">Lewy przycisk myszy = wybrane narzędzie · prawy przycisk = odwrotnie · Strg + kółko = powiększenie · Strg+Z = cofnij · Esc = zamknij</div>
 </div>
 <div id="pedzel"></div>
+<script>
+// ---------- Dzień / noc ----------
+(function(){
+  const przycisk = document.getElementById('motyw');
+  const pokaz = () => przycisk.textContent = document.documentElement.dataset.motyw === 'ciemny' ? '☀️ Dzień' : '🌙 Noc';
+  przycisk.onclick = () => {
+    const nowy = document.documentElement.dataset.motyw === 'ciemny' ? 'jasny' : 'ciemny';
+    document.documentElement.dataset.motyw = nowy;
+    try{ localStorage.setItem('usuwanieTla.motyw', nowy); }catch(e){}
+    pokaz();
+  };
+  pokaz();
+})();
+</script>
 
+<script>
+// motyw dzień / noc – ustawiany od razu, żeby strona nie mrugała
+(function(){
+  let m = null; try{ m = localStorage.getItem('usuwanieTla.motyw'); }catch(e){}
+  if (!m) m = matchMedia('(prefers-color-scheme: dark)').matches ? 'ciemny' : 'jasny';
+  document.documentElement.dataset.motyw = m;
+})();
+</script>
 <script type="module">
 import { AutoModel, AutoProcessor, RawImage, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
 
@@ -171,7 +219,8 @@ function zapiszUstawienia(){
   try{
     localStorage.setItem(ZAPIS, JSON.stringify({
       jakosc: $('#jakosc').value, czysc: $('#czysc').value, drobne: $('#drobne').value,
-      poswiata: $('#poswiata').checked, kolor: $('#kolor').value, margines: $('#margines').value
+      poswiata: $('#poswiata').checked, kolor: $('#kolor').value, margines: $('#margines').value,
+      cien: $('#cien').value, sila: $('#sila').value, autoZapis: $('#autoZapis').checked
     }));
   }catch(e){}
 }
@@ -183,9 +232,14 @@ try{
   if (s.poswiata != null) $('#poswiata').checked = s.poswiata;
   if (s.kolor) $('#kolor').value = s.kolor;
   if (s.margines != null) $('#margines').value = s.margines;
+  if (s.cien) $('#cien').value = s.cien;
+  if (s.sila != null) $('#sila').value = s.sila;
+  if (s.autoZapis != null) $('#autoZapis').checked = s.autoZapis;
 }catch(e){}
 function opisySuwakow(){
   $('#czyscTxt').textContent = $('#czysc').value;
+  $('#silaTxt').textContent = $('#sila').value + '%';
+  $('#silaBox').style.display = $('#cien').value === 'brak' ? 'none' : '';
   $('#drobneTxt').textContent = ($('#drobne').value / 10).toFixed(1) + '%';
   $('#marginesTxt').textContent = $('#margines').value + '%';
   $('#rozmiarTxt').textContent = $('#rozmiar').value + ' px';
@@ -274,6 +328,7 @@ function utworzKarte(plik){
   karta.querySelector('.nazwa').textContent = plik.name;
   karta.querySelector('img').src = url;
   $('#lista').prepend(karta);
+  setTimeout(opcjeZapisu);
 
   const z = { plik, url, karta, nazwa: plik.name.replace(/\.[^.]+$/, ''), maska: null, wynik: null };
   z.stan = (t, k='') => { const s = karta.querySelector('.stan'); s.textContent = t; s.className = 'stan ' + k; };
@@ -324,6 +379,7 @@ async function przetworz(z){
     rysuj(z);
     z.stan(bezAI ? 'Gotowe ✔ (bez usuwania tła)' : `Gotowe ✔ (${((performance.now()-t0)/1000).toFixed(1)} s)`, 'ok');
     z.przyciski(true);
+    if (folder && $('#autoZapis').checked) await pobierz(z, false);
   }catch(e){
     console.error(e);
     z.stan('Błąd: ' + e.message, 'blad');
@@ -404,6 +460,8 @@ function ustawienia(){
     drobne: +$('#drobne').value,
     poswiata: $('#poswiata').checked,
     przytnij: $('#przytnij').checked,
+    cien: $('#cien').value,
+    sila: $('#sila').value / 100,
     margines: $('#margines').value / 100
   };
 }
@@ -440,26 +498,73 @@ function rysuj(z){
   liczPiksele(z, u, obraz.data, 0, 0, w, h, false);
   ctx.putImageData(obraz, 0, 0);
 
+  // granice obiektu
+  const d = obraz.data;
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 0; y < h; y++){
+    const wiersz = y * w;
+    for (let x = 0; x < w; x++){
+      if (d[4*(wiersz+x)+3] > 20){ if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+    }
+  }
+  const jest = maxX >= 0;
+  const bw = maxX - minX + 1, bh = maxY - minY + 1, duzy = Math.max(bw, bh);
+
+  // cień – gdzie będzie i jak daleko sięga
+  let cien = null;
+  if (jest && u.cien !== 'brak'){
+    if (u.cien === 'pod'){
+      const rx = bw * 0.55, ry = Math.max(4, bw * 0.07);
+      cien = { typ: 'pod', cx: (minX + maxX) / 2, cy: maxY - ry * 0.25, rx, ry,
+               l: (minX + maxX) / 2 - rx, t: maxY - ry, r: (minX + maxX) / 2 + rx, b: maxY + ry };
+    } else {
+      const roz = duzy * 0.025, dx = duzy * 0.035, dy = duzy * 0.045;
+      cien = { typ: 'rzucony', roz, dx, dy, l: minX - 2*roz, t: minY - 2*roz, r: maxX + dx + 2*roz, b: maxY + dy + 2*roz };
+    }
+  }
+
   let sx = 0, sy = 0, sw = w, sh = h;
-  if (u.przytnij){
-    const d = obraz.data;
-    let minX = w, minY = h, maxX = -1, maxY = -1;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
-      if (d[4*(y*w+x)+3] > 20){ if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
-    }
-    if (maxX >= 0){
-      const m = Math.round(Math.max(maxX - minX, maxY - minY) * u.margines);
-      sx = Math.max(0, minX - m); sy = Math.max(0, minY - m);
-      sw = Math.min(w, maxX + m + 1) - sx; sh = Math.min(h, maxY + m + 1) - sy;
-    }
+  if (u.przytnij && jest){
+    let l = minX, t = minY, r = maxX + 1, b = maxY + 1;
+    if (cien){ l = Math.min(l, cien.l); t = Math.min(t, cien.t); r = Math.max(r, cien.r); b = Math.max(b, cien.b); }
+    const m = Math.round(duzy * u.margines);
+    sx = Math.floor(l - m); sy = Math.floor(t - m);
+    let px = Math.ceil(r + m), py = Math.ceil(b + m);
+    if (!cien){ sx = Math.max(0, sx); sy = Math.max(0, sy); px = Math.min(w, px); py = Math.min(h, py); }  // przy cieniu wolno wyjść poza zdjęcie
+    sw = px - sx; sh = py - sy;
   }
   const out = document.createElement('canvas'); out.width = sw; out.height = sh;
   const o = out.getContext('2d');
   if (u.tlo){ o.fillStyle = u.tlo; o.fillRect(0, 0, sw, sh); }
-  o.drawImage(c, sx, sy, sw, sh, 0, 0, sw, sh);
+  if (cien) rysujCien(o, c, cien, u.sila, -sx, -sy);
+  o.drawImage(c, -sx, -sy);
   z.wynik = out;
   const pole = z.karta.querySelector('.wynik');
   pole.innerHTML = ''; pole.appendChild(out);
+}
+
+function rysujCien(o, c, s, sila, ox, oy){
+  o.save();
+  if (s.typ === 'pod'){
+    // miękka plama pod spodem + ciemniejszy środek tuż przy styku ze stołem
+    const plama = (cx, cy, rx, ry, a) => {
+      o.save(); o.translate(cx + ox, cy + oy); o.scale(rx, ry);
+      const g = o.createRadialGradient(0, 0, 0, 0, 0, 1);
+      g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(0.6, `rgba(0,0,0,${a * 0.45})`); g.addColorStop(1, 'rgba(0,0,0,0)');
+      o.fillStyle = g; o.fillRect(-1, -1, 2, 2); o.restore();
+    };
+    plama(s.cx, s.cy, s.rx, s.ry, sila * 0.75);
+    plama(s.cx, s.cy - s.ry * 0.15, s.rx * 0.6, s.ry * 0.45, sila * 0.6);
+  } else {
+    // sylwetka obiektu w kolorze czarnym, rozmyta i przesunięta
+    const syl = document.createElement('canvas'); syl.width = c.width; syl.height = c.height;
+    const sc = syl.getContext('2d');
+    sc.drawImage(c, 0, 0); sc.globalCompositeOperation = 'source-in'; sc.fillStyle = '#000'; sc.fillRect(0, 0, syl.width, syl.height);
+    o.filter = `blur(${Math.max(1, s.roz)}px)`;
+    o.globalAlpha = sila;
+    o.drawImage(syl, ox + s.dx, oy + s.dy);
+  }
+  o.restore();
 }
 
 let opoznienie;
@@ -487,6 +592,7 @@ function zamknijEdytor(){
   $('#edytor').classList.remove('otwarty');
   pedzel.style.display = 'none';
   rysuj(ed.z);
+  if (folder && $('#autoZapis').checked && ed.z.zapisanoJako) pobierz(ed.z, false);   // nadpisz poprawione
   ed.z = null; ed.obraz = null;
 }
 function edOdswiez(x0, y0, x1, y1){
@@ -624,8 +730,7 @@ async function zrobIco(src){
   return new Blob([buf], { type: 'image/x-icon' });
 }
 
-async function pobierz(z){
-  if (!z.wynik) return;
+async function zrobPlik(z){
   const format = $('#format').value, max = +$('#wielkosc').value, jakosc = $('#jakoscPliku').value / 100;
   const src = z.wynik;
   let blob;
@@ -644,9 +749,88 @@ async function pobierz(z){
       blob = await doBloba(c, format === 'webp' ? 'image/webp' : 'image/png', format === 'webp' ? jakosc : undefined);
     }
   }
+  return { blob, nazwa: z.nazwa + ($('#bezAI').checked ? '' : '_bez_tla') + '.' + format };
+}
+
+// ---------- Zapis do wybranego folderu (np. OneDrive) ----------
+let folder = null;
+const umieFolder = 'showDirectoryPicker' in window;
+function baza(){
+  return new Promise((ok, zle) => {
+    const r = indexedDB.open('usuwanieTla', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('k');
+    r.onsuccess = () => ok(r.result); r.onerror = () => zle(r.error);
+  });
+}
+async function bazaZapisz(k, v){
+  const db = await baza();
+  return new Promise((ok, zle) => {
+    const t = db.transaction('k', 'readwrite');
+    if (v == null) t.objectStore('k').delete(k); else t.objectStore('k').put(v, k);
+    t.oncomplete = ok; t.onerror = () => zle(t.error);
+  });
+}
+async function bazaCzytaj(k){
+  const db = await baza();
+  return new Promise((ok, zle) => {
+    const r = db.transaction('k').objectStore('k').get(k);
+    r.onsuccess = () => ok(r.result); r.onerror = () => zle(r.error);
+  });
+}
+async function dostepDoFolderu(prosic){
+  if (!folder) return false;
+  if (await folder.queryPermission({ mode: 'readwrite' }) === 'granted') return true;
+  if (!prosic) return false;
+  return await folder.requestPermission({ mode: 'readwrite' }) === 'granted';
+}
+function pokazFolder(){
+  $('#folderNazwa').textContent = folder ? '📂 ' + folder.name : 'pobieranie do „Downloads”';
+  $('#folderNazwa').style.color = folder ? 'var(--ok)' : '';
+  $('#zapomnijFolder').style.display = folder ? '' : 'none';
+  $('#autoZapisBox').style.display = folder ? 'inline-flex' : 'none';
+  opcjeZapisu();
+}
+if (!umieFolder) $('#folderBox').style.display = 'none';
+else {
+  bazaCzytaj('folder').then(f => { if (f){ folder = f; pokazFolder(); } }).catch(() => {});
+  $('#wybierzFolder').onclick = async () => {
+    try{
+      folder = await window.showDirectoryPicker({ id: 'usuwanieTla', mode: 'readwrite' });
+      await bazaZapisz('folder', folder);
+      pokazFolder();
+    }catch(e){ if (e.name !== 'AbortError') alert('Nie udało się wybrać folderu: ' + e.message); }
+  };
+  $('#zapomnijFolder').onclick = async () => { folder = null; await bazaZapisz('folder', null).catch(() => {}); pokazFolder(); };
+}
+
+async function wolnaNazwa(nazwa){
+  const kropka = nazwa.lastIndexOf('.'), rdzen = nazwa.slice(0, kropka), roz = nazwa.slice(kropka);
+  for (let n = 1; n < 1000; n++){
+    const proba = n === 1 ? nazwa : `${rdzen} (${n})${roz}`;
+    try{ await folder.getFileHandle(proba); } catch(e){ return proba; }   // nie ma takiego pliku -> wolna
+  }
+  return nazwa;
+}
+
+// prosic = czy wolno zapytać o dostęp (tylko po kliknięciu)
+async function pobierz(z, prosic = true){
+  if (!z.wynik) return;
+  if (folder){
+    if (!(await dostepDoFolderu(prosic))){ z.stan('Kliknij „Zapisz”, żeby pozwolić na zapis do folderu', 'blad'); return; }
+    const { blob, nazwa } = await zrobPlik(z);
+    // to samo zdjęcie zapisane drugi raz w tym samym formacie -> nadpisz zamiast robić kopię
+    const cel = (z.zapisanoJako && z.zapisanoJako.endsWith(nazwa.slice(nazwa.lastIndexOf('.')))) ? z.zapisanoJako : await wolnaNazwa(nazwa);
+    const plik = await folder.getFileHandle(cel, { create: true });
+    const zapis = await plik.createWritable();
+    await zapis.write(blob); await zapis.close();
+    z.zapisanoJako = cel;
+    z.stan('💾 Zapisano: ' + cel, 'ok');
+    return;
+  }
+  const { blob, nazwa } = await zrobPlik(z);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = z.nazwa + ($('#bezAI').checked ? '' : '_bez_tla') + '.' + format;
+  a.download = nazwa;
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
@@ -655,7 +839,9 @@ function opcjeZapisu(){
   $('#jakoscPlikuBox').style.display = (f === 'jpg' || f === 'webp') ? '' : 'none';
   $('#wielkosc').style.display = f === 'ico' ? 'none' : '';
   $('#jakoscPlikuTxt').textContent = $('#jakoscPliku').value + '%';
-  document.querySelectorAll('.pobierz').forEach(b => b.textContent = '⬇ ' + f.toUpperCase());
+  const ikona = (typeof folder !== 'undefined' && folder) ? '💾 ' : '⬇ ';
+  document.querySelectorAll('.pobierz').forEach(b => b.textContent = ikona + f.toUpperCase());
+  $('#pobierzWszystkie').textContent = (typeof folder !== 'undefined' && folder) ? '💾 Zapisz wszystkie' : '⬇ Pobierz wszystkie';
   try{
     localStorage.setItem('usuwanieTla.zapis', JSON.stringify({ f, j: $('#jakoscPliku').value, w: $('#wielkosc').value }));
   }catch(e){}
@@ -672,7 +858,10 @@ $('#wielkosc').onchange = opcjeZapisu;
 opcjeZapisu();
 function odswiezPrzycisk(){ $('#pobierzWszystkie').disabled = !zdjecia.some(z => z.wynik); }
 $('#pobierzWszystkie').onclick = async () => {
-  for (const z of zdjecia){ if (z.wynik){ await pobierz(z); await new Promise(r => setTimeout(r, 400)); } }
+  if (folder && !(await dostepDoFolderu(true))) return;
+  for (const z of zdjecia){
+    if (z.wynik){ await pobierz(z, false); if (!folder) await new Promise(r => setTimeout(r, 400)); }
+  }
 };
 $('#wyczysc').onclick = () => { [...zdjecia].forEach(z => z.karta.querySelector('.usun').click()); };
 
@@ -692,7 +881,9 @@ document.addEventListener('paste', e => {
 document.querySelectorAll('input[name=tlo]').forEach(r => r.onchange = rysujWszystkie);
 $('#kolor').oninput = () => { document.querySelector('input[name=tlo][value=kolor]').checked = true; rysujWszystkie(); };
 ['#czysc', '#drobne', '#margines'].forEach(s => $(s).oninput = rysujWszystkie);
-['#poswiata', '#przytnij'].forEach(s => $(s).onchange = rysujWszystkie);
+['#poswiata', '#przytnij', '#cien'].forEach(s => $(s).onchange = rysujWszystkie);
+$('#sila').oninput = rysujWszystkie;
+$('#autoZapis').onchange = zapiszUstawienia;
 $('#bezAI').onchange = () => $('#jakosc').onchange();
 $('#jakosc').onchange = () => {
   zapiszUstawienia();
