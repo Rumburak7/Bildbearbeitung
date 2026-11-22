@@ -88,6 +88,14 @@
   footer{text-align:center;color:var(--szary);font-size:15px;padding:30px}
   footer b{background:linear-gradient(90deg,#7c3aed,#db2777);-webkit-background-clip:text;background-clip:text;color:transparent}
 
+  #animacja{margin-bottom:24px}
+  .animUklad{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:22px;align-items:start}
+  .animPodglad{height:520px;border-radius:14px;border:1.5px solid var(--ramka);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;cursor:ew-resize;user-select:none}
+  .animPodglad canvas{max-width:100%;max-height:100%}
+  #animPusto{position:absolute;text-align:center;color:var(--szary);font-size:18px;padding:20px}
+  .animOpcje{display:flex;flex-direction:column;gap:14px}
+  .animOpcje button{width:100%}
+  #animPostep{min-height:22px}
   @media (max-width:1300px){ #opcje{grid-template-columns:repeat(2,1fr)} }
 
   /* ---- edytor ręczny ---- */
@@ -123,6 +131,14 @@
         <option value="fp32">dokładny (ok. 175 MB)</option>
         <option value="q8">szybki (ok. 45 MB)</option>
       </select>
+      <label title="Przy wielu dużych zdjęciach (np. 36 do animacji) zmniejsz je – będzie szybciej i starczy pamięci"><span class="opis">wczytuj</span>
+        <select id="wczytaj">
+          <option value="0">w pełnym rozmiarze</option>
+          <option value="2000">max 2000 px</option>
+          <option value="1500">max 1500 px</option>
+          <option value="1200">max 1200 px</option>
+          <option value="1000">max 1000 px</option>
+        </select></label>
       <label title="Nie usuwa tła – tylko zmienia format, rozmiar albo robi ikonę"><input type="checkbox" id="bezAI"> <span>bez usuwania tła<br><small>(tylko zmiana formatu)</small></span></label>
     </div>
     <div class="panel" style="--k:#ec4899">
@@ -191,6 +207,38 @@
       <h3>🚀 Gotowe zdjęcia</h3>
       <button class="glowny duzy" id="pobierzWszystkie" disabled>⬇ Pobierz wszystkie</button>
       <button id="wyczysc">🗑️ Wyczyść listę</button>
+    </div>
+  </section>
+
+  <section id="animacja" class="panel" style="--k:#06b6d4;display:none">
+    <h3>🎬 Animacja 360° <small id="animInfo"></small></h3>
+    <div class="animUklad">
+      <div class="animPodglad szachownica" title="Przeciągnij myszką w lewo/prawo, żeby obracać">
+        <canvas id="animCanvas"></canvas>
+        <div id="animPusto">Wrzuć zdjęcia ze stolika obrotowego (np. 36 sztuk = co 10°).<br>Klatki idą w kolejności nazw plików.</div>
+      </div>
+      <div class="animOpcje">
+        <label><span class="opis">obrót trwa</span> <input type="range" id="animCzas" min="1" max="15" step="0.5" value="4"> <span class="liczba" id="animCzasTxt"></span></label>
+        <label><span class="opis">wielkość</span>
+          <select id="animRozmiar">
+            <option value="400">400 px (mały plik)</option>
+            <option value="600" selected>600 px</option>
+            <option value="800">800 px</option>
+            <option value="1000">1000 px (duży plik)</option>
+          </select></label>
+        <label><input type="checkbox" id="animWstecz"> obracaj w drugą stronę</label>
+        <label><span class="opis">obroty w filmie</span>
+          <select id="animObroty">
+            <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="5">5</option>
+          </select></label>
+        <div class="rzad">
+          <button id="animStart" disabled>⏸ Pauza</button>
+        </div>
+        <button class="glowny duzy" id="animGif" disabled>🎞️ Zapisz GIF</button>
+        <button class="glowny duzy" id="animFilm" disabled style="background:linear-gradient(135deg,#0891b2,#2563eb)">🎥 Zapisz film</button>
+        <div id="animPostep" class="liczba"></div>
+        <small>Kadr, tło i cień biorą się z ustawień wyżej (najlepiej z „przytnij do obiektu”). GIF i film zawsze mają tło – przy „przezroczyste” będzie białe.</small>
+      </div>
     </div>
   </section>
 
@@ -263,7 +311,7 @@ function zapiszUstawienia(){
     localStorage.setItem(ZAPIS, JSON.stringify({
       jakosc: $('#jakosc').value, czysc: $('#czysc').value, drobne: $('#drobne').value,
       poswiata: $('#poswiata').checked, kolor: $('#kolor').value, margines: $('#margines').value,
-      cien: $('#cien').value, sila: $('#sila').value, autoZapis: $('#autoZapis').checked,
+      cien: $('#cien').value, sila: $('#sila').value, autoZapis: $('#autoZapis').checked, wczytaj: $('#wczytaj').value,
       kier: document.querySelector('input[name=kier]:checked').value, dlugosc: $('#dlugosc').value
     }));
   }catch(e){}
@@ -280,6 +328,7 @@ try{
   if (s.sila != null) $('#sila').value = s.sila;
   if (s.kier) { const r = document.querySelector(`input[name=kier][value="${s.kier}"]`); if (r) r.checked = true; }
   if (s.dlugosc != null) $('#dlugosc').value = s.dlugosc;
+  if (s.wczytaj != null) $('#wczytaj').value = s.wczytaj;
   if (s.autoZapis != null) $('#autoZapis').checked = s.autoZapis;
 }catch(e){}
 function opisySuwakow(){
@@ -345,13 +394,24 @@ async function liczMaske(z){
 
 // ---------- Lista zdjęć ----------
 const zdjecia = [];
-let kolejka = Promise.resolve();
-function doKolejki(z){ kolejka = kolejka.then(() => przetworz(z)); }
+let kolejka = Promise.resolve(), wKolejce = 0;
+function doKolejki(z){
+  wKolejce++;
+  kolejka = kolejka.then(() => przetworz(z)).finally(() => { wKolejce--; if (!wKolejce) animZmiana(); });
+}
+const porownajNazwy = (a, b) => a.localeCompare(b, 'pl', { numeric: true, sensitivity: 'base' });
 
 function dodajPliki(pliki){
-  for (const plik of pliki){
-    if (!plik.type.startsWith('image/')) continue;
+  const lista = [...pliki].filter(p => p.type.startsWith('image/')).sort((a, b) => porownajNazwy(a.name, b.name));
+  // dużo zdjęć naraz (np. 36 ze stolika) w pełnym rozmiarze zapchałoby pamięć -> zmniejsz do 1500 px
+  let limit = +$('#wczytaj').value;
+  if (!limit && lista.length >= 10){
+    limit = 1500;
+    ustawStatus(`Dużo zdjęć (${lista.length}) – wczytuję je zmniejszone do 1500 px, żeby starczyło pamięci`);
+  }
+  for (const plik of lista){
     const z = utworzKarte(plik);
+    z.limit = limit;
     zdjecia.push(z);
     doKolejki(z);
   }
@@ -375,7 +435,7 @@ function utworzKarte(plik){
     </div>`;
   karta.querySelector('.nazwa').textContent = plik.name;
   karta.querySelector('img').src = url;
-  $('#lista').prepend(karta);
+  $('#lista').append(karta);
   setTimeout(opcjeZapisu);
 
   const z = { plik, url, karta, nazwa: plik.name.replace(/\.[^.]+$/, ''), maska: null, wynik: null };
@@ -387,7 +447,7 @@ function utworzKarte(plik){
   karta.querySelector('.usun').onclick = () => {
     karta.remove(); URL.revokeObjectURL(url);
     const i = zdjecia.indexOf(z); if (i >= 0) zdjecia.splice(i, 1);
-    z.usuniete = true; odswiezPrzycisk();
+    z.usuniete = true; odswiezPrzycisk(); animZmiana();
   };
   return z;
 }
@@ -404,10 +464,13 @@ async function przetworz(z){
     const t0 = performance.now();
     if (!z.oryg){
       const bm = await createImageBitmap(z.plik);
-      z.w = bm.width; z.h = bm.height;
-      const c = document.createElement('canvas'); c.width = z.w; c.height = z.h;
+      let w = bm.width, h = bm.height;
+      if (z.limit && Math.max(w, h) > z.limit){ const k = z.limit / Math.max(w, h); w = Math.round(w * k); h = Math.round(h * k); }
+      z.w = w; z.h = h;
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
       const ctx = c.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(bm, 0, 0);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(bm, 0, 0, w, h);
       z.oryg = ctx.getImageData(0, 0, z.w, z.h).data;
       z.reczne = new Uint8Array(z.w * z.h);
       bm.close && bm.close();
@@ -539,9 +602,9 @@ function liczPiksele(z, u, d, x0, y0, x1, y1, czerwone){
   }
 }
 
-function rysuj(z){
-  if (!z.maska) return;
-  const u = ustawienia(), { w, h } = z;
+// liczy obiekt bez kadrowania: płótno w pełnym rozmiarze, granice obiektu i cienie
+function przygotuj(z, u){
+  const { w, h } = z;
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   const obraz = ctx.createImageData(w, h);
@@ -578,26 +641,36 @@ function rysuj(z){
                     l: minX + Math.min(0, dx) - 2*roz, t: minY - 2*roz, r: maxX + Math.max(0, dx) + 2*roz, b: maxY + dy + 2*roz });
     }
   }
-  const cien = cienie.length > 0;
+  // zasięg obiektu razem z cieniem
+  let l = minX, t = minY, r = maxX + 1, b = maxY + 1;
+  for (const q of cienie){ l = Math.min(l, q.l); t = Math.min(t, q.t); r = Math.max(r, q.r); b = Math.max(b, q.b); }
+  return { c, w, h, jest, duzy, cienie, l, t, r, b };
+}
 
-  let sx = 0, sy = 0, sw = w, sh = h;
-  if (u.przytnij && jest){
-    let l = minX, t = minY, r = maxX + 1, b = maxY + 1;
-    for (const q of cienie){ l = Math.min(l, q.l); t = Math.min(t, q.t); r = Math.max(r, q.r); b = Math.max(b, q.b); }
-    const m = Math.round(duzy * u.margines);
-    sx = Math.floor(l - m); sy = Math.floor(t - m);
-    let px = Math.ceil(r + m), py = Math.ceil(b + m);
-    if (!cien){ sx = Math.max(0, sx); sy = Math.max(0, sy); px = Math.min(w, px); py = Math.min(h, py); }  // przy cieniu wolno wyjść poza zdjęcie
-    sw = px - sx; sh = py - sy;
-  }
+// składa gotowy obrazek z wybranego wycinka (sx, sy, sw, sh)
+function skladaj(p, tlo, sx, sy, sw, sh){
   const out = document.createElement('canvas'); out.width = sw; out.height = sh;
   const o = out.getContext('2d');
-  if (u.tlo){ o.fillStyle = u.tlo; o.fillRect(0, 0, sw, sh); }
-  for (const q of cienie) rysujCien(o, c, q, q.sila, -sx, -sy);
-  o.drawImage(c, -sx, -sy);
-  z.wynik = out;
+  if (tlo){ o.fillStyle = tlo; o.fillRect(0, 0, sw, sh); }
+  for (const q of p.cienie) rysujCien(o, p.c, q, q.sila, -sx, -sy);
+  o.drawImage(p.c, -sx, -sy);
+  return out;
+}
+
+function rysuj(z){
+  if (!z.maska) return;
+  const u = ustawienia(), p = przygotuj(z, u), { w, h } = p;
+  let sx = 0, sy = 0, sw = w, sh = h;
+  if (u.przytnij && p.jest){
+    const m = Math.round(p.duzy * u.margines);
+    sx = Math.floor(p.l - m); sy = Math.floor(p.t - m);
+    let px = Math.ceil(p.r + m), py = Math.ceil(p.b + m);
+    if (!p.cienie.length){ sx = Math.max(0, sx); sy = Math.max(0, sy); px = Math.min(w, px); py = Math.min(h, py); }  // przy cieniu wolno wyjść poza zdjęcie
+    sw = px - sx; sh = py - sy;
+  }
+  z.wynik = skladaj(p, u.tlo, sx, sy, sw, sh);
   const pole = z.karta.querySelector('.wynik');
-  pole.innerHTML = ''; pole.appendChild(out);
+  pole.innerHTML = ''; pole.appendChild(z.wynik);
 }
 
 function rysujCien(o, c, s, sila, ox, oy){
@@ -628,7 +701,7 @@ let opoznienie;
 function rysujWszystkie(){
   opisySuwakow(); zapiszUstawienia();
   clearTimeout(opoznienie);
-  opoznienie = setTimeout(() => zdjecia.forEach(rysuj), 200);
+  opoznienie = setTimeout(() => { zdjecia.forEach(rysuj); animZmiana(); }, 200);
 }
 
 // ---------- Edytor ręczny ----------
@@ -650,6 +723,7 @@ function zamknijEdytor(){
   pedzel.style.display = 'none';
   rysuj(ed.z);
   if (folder && $('#autoZapis').checked && ed.z.zapisanoJako) pobierz(ed.z, false);   // nadpisz poprawione
+  animZmiana();
   ed.z = null; ed.obraz = null;
 }
 function edOdswiez(x0, y0, x1, y1){
@@ -922,6 +996,278 @@ $('#pobierzWszystkie').onclick = async () => {
 };
 $('#wyczysc').onclick = () => { [...zdjecia].forEach(z => z.karta.querySelector('.usun').click()); };
 
+// ---------- Animacja 360° ----------
+const anim = { klatki: [], nr: 0, gra: true, timer: null, brudne: true, odl: null, budowa: 0, ciagnie: null };
+const animCanvas = $('#animCanvas');
+
+function animGotowe(){ return zdjecia.filter(z => z.wynik && z.maska).sort((a, b) => porownajNazwy(a.plik.name, b.plik.name)); }
+
+// wołane po każdej zmianie – przebudowa klatek z opóźnieniem
+function animZmiana(){
+  anim.brudne = true;
+  const gotowe = animGotowe();
+  $('#animacja').style.display = zdjecia.length >= 2 ? '' : 'none';
+  $('#animInfo').textContent = gotowe.length ? `– ${gotowe.length} klatek (co ${(360 / gotowe.length).toFixed(1)}°)` : '';
+  clearTimeout(anim.odl);
+  if (gotowe.length >= 2 && !wKolejce) anim.odl = setTimeout(animBuduj, 500);
+}
+
+const czekaj = ms => new Promise(r => setTimeout(r, ms));
+
+// buduje wszystkie klatki: ten sam wycinek i ta sama wielkość dla każdej, żeby obiekt nie skakał
+async function animBuduj(){
+  const nrBudowy = ++anim.budowa;
+  const gotowe = animGotowe();
+  if (gotowe.length < 2) return false;
+  const u = ustawienia(), tlo = u.tlo || '#ffffff', rozmiar = +$('#animRozmiar').value;
+  $('#animPostep').textContent = 'Przygotowuję klatki...';
+  // 1) wspólny wycinek ze wszystkich zdjęć
+  let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity, duzy = 0;
+  const W = gotowe[0].w, H = gotowe[0].h;
+  if (u.przytnij){
+    for (let i = 0; i < gotowe.length; i++){
+      const p = przygotuj(gotowe[i], u);
+      if (p.jest){ l = Math.min(l, p.l); t = Math.min(t, p.t); r = Math.max(r, p.r); b = Math.max(b, p.b); }
+      if (i % 4 === 3){ await czekaj(0); if (nrBudowy !== anim.budowa) return false; }
+    }
+    if (l === Infinity){ l = 0; t = 0; r = W; b = H; }
+    duzy = Math.max(r - l, b - t);
+    const m = duzy * u.margines;
+    l -= m; t -= m; r += m; b += m;
+  } else { l = 0; t = 0; r = W; b = H; }
+  const sx = Math.floor(l), sy = Math.floor(t), sw = Math.ceil(r) - sx, sh = Math.ceil(b) - sy;
+  // 2) wielkość klatki (parzysta – tego wymaga film)
+  const k = rozmiar / Math.max(sw, sh);
+  const fw = Math.max(2, Math.round(sw * k / 2) * 2), fh = Math.max(2, Math.round(sh * k / 2) * 2);
+  // 3) klatki
+  const klatki = [];
+  for (let i = 0; i < gotowe.length; i++){
+    const duza = skladaj(przygotuj(gotowe[i], u), tlo, sx, sy, sw, sh);
+    klatki.push(skaluj(duza, fw, fh));
+    if (i % 3 === 2){
+      $('#animPostep').textContent = `Przygotowuję klatki... ${i + 1}/${gotowe.length}`;
+      await czekaj(0); if (nrBudowy !== anim.budowa) return false;
+    }
+  }
+  anim.klatki = klatki; anim.brudne = false;
+  anim.nr = Math.min(anim.nr, klatki.length - 1);
+  animCanvas.width = fw; animCanvas.height = fh;
+  $('#animPusto').style.display = 'none';
+  ['#animStart', '#animGif', '#animFilm'].forEach(q => $(q).disabled = false);
+  $('#animPostep').textContent = `Gotowe: ${klatki.length} klatek, ${fw}×${fh} px`;
+  animRysuj(); animGraj();
+  return true;
+}
+
+function animRysuj(){
+  if (!anim.klatki.length) return;
+  const n = anim.klatki.length;
+  const i = ((anim.nr % n) + n) % n;
+  animCanvas.getContext('2d').drawImage(anim.klatki[i], 0, 0);
+}
+function animOpoznienie(){ return $('#animCzas').value * 1000 / Math.max(1, anim.klatki.length); }
+function animGraj(){
+  clearTimeout(anim.timer);
+  if (!anim.gra || !anim.klatki.length) return;
+  anim.timer = setTimeout(() => {
+    anim.nr += $('#animWstecz').checked ? -1 : 1;
+    animRysuj(); animGraj();
+  }, animOpoznienie());
+}
+$('#animStart').onclick = () => {
+  anim.gra = !anim.gra;
+  $('#animStart').textContent = anim.gra ? '⏸ Pauza' : '▶ Odtwarzaj';
+  animGraj();
+};
+// obracanie myszką
+$('.animPodglad').addEventListener('mousedown', e => {
+  if (!anim.klatki.length) return;
+  anim.ciagnie = { x: e.clientX, nr: anim.nr };
+  clearTimeout(anim.timer);
+  e.preventDefault();
+});
+window.addEventListener('mousemove', e => {
+  if (!anim.ciagnie) return;
+  const krok = Math.max(4, animCanvas.getBoundingClientRect().width / anim.klatki.length / 1.5);
+  anim.nr = anim.ciagnie.nr + Math.round((e.clientX - anim.ciagnie.x) / krok) * ($('#animWstecz').checked ? -1 : 1);
+  animRysuj();
+});
+window.addEventListener('mouseup', () => { if (anim.ciagnie){ anim.ciagnie = null; animGraj(); } });
+$('#animCzas').oninput = () => { $('#animCzasTxt').textContent = $('#animCzas').value + ' s'; animGraj(); };
+$('#animCzasTxt').textContent = $('#animCzas').value + ' s';
+$('#animRozmiar').onchange = () => animZmiana();
+$('#animWstecz').onchange = animGraj;
+
+// klatki w kolejności odtwarzania
+function animKolejnosc(){
+  const k = [...anim.klatki];
+  if ($('#animWstecz').checked) k.reverse();
+  return k;
+}
+
+// zapis gotowego pliku – do wybranego folderu albo zwykłe pobieranie
+async function zapiszBlob(blob, nazwa){
+  if (folder && await dostepDoFolderu(true)){
+    const cel = await wolnaNazwa(nazwa);
+    const plik = await folder.getFileHandle(cel, { create: true });
+    const zapis = await plik.createWritable(); await zapis.write(blob); await zapis.close();
+    return '💾 Zapisano w folderze: ' + cel;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nazwa; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  return '⬇ Pobrano: ' + nazwa;
+}
+function nazwaAnimacji(){
+  const g = animGotowe();
+  return g.length ? g[0].nazwa.replace(/[_\-\s]*\d+$/, '') || 'animacja' : 'animacja';
+}
+
+// ----- GIF -----
+function paletaMedianCut(klatkiDane, ile){
+  let razem = 0; for (const d of klatkiDane) razem += d.length / 4;
+  const krok = Math.max(1, Math.floor(razem / 250000));
+  const probki = [];
+  for (const d of klatkiDane) for (let i = 0; i < d.length / 4; i += krok) probki.push((d[4*i] << 16) | (d[4*i+1] << 8) | d[4*i+2]);
+  const opis = px => {
+    let mn = [255, 255, 255], mx = [0, 0, 0];
+    for (const v of px){ const c = [(v >> 16) & 255, (v >> 8) & 255, v & 255]; for (let k = 0; k < 3; k++){ if (c[k] < mn[k]) mn[k] = c[k]; if (c[k] > mx[k]) mx[k] = c[k]; } }
+    const zak = [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]];
+    const kan = zak[0] >= zak[1] && zak[0] >= zak[2] ? 0 : zak[1] >= zak[2] ? 1 : 2;
+    return { px, kan, zak: zak[kan] };
+  };
+  let pudla = [opis(Int32Array.from(probki))];
+  while (pudla.length < ile){
+    let naj = -1, wynik = 0;
+    pudla.forEach((p, i) => { const w = p.zak * Math.sqrt(p.px.length); if (p.px.length > 1 && p.zak > 0 && w > wynik){ wynik = w; naj = i; } });
+    if (naj < 0) break;
+    const p = pudla[naj], sh = 16 - 8 * p.kan;
+    const posort = p.px.slice().sort((a, b) => ((a >> sh) & 255) - ((b >> sh) & 255));
+    const pol = posort.length >> 1;
+    pudla.splice(naj, 1, opis(posort.slice(0, pol)), opis(posort.slice(pol)));
+  }
+  const paleta = new Uint8Array(ile * 3);
+  pudla.forEach((p, i) => {
+    let r = 0, g = 0, b = 0;
+    for (const v of p.px){ r += (v >> 16) & 255; g += (v >> 8) & 255; b += v & 255; }
+    const n = p.px.length || 1;
+    paleta[3*i] = r / n; paleta[3*i+1] = g / n; paleta[3*i+2] = b / n;
+  });
+  return { paleta, ileKolorow: pudla.length };
+}
+
+function lzw(indeksy, minKod){
+  const clear = 1 << minKod, eoi = clear + 1;
+  let rozmKodu = minKod + 1, nast = eoi + 1;
+  const out = []; let akum = 0, bity = 0;
+  const wyslij = c => { akum |= c << bity; bity += rozmKodu; while (bity >= 8){ out.push(akum & 255); akum >>>= 8; bity -= 8; } };
+  // słownik: znacznik pokolenia zamiast czyszczenia całej tablicy
+  const tab = new Int32Array(4096 * 256), pok = new Int32Array(4096 * 256); let gen = 1;
+  wyslij(clear);
+  let pref = indeksy[0];
+  for (let i = 1; i < indeksy.length; i++){
+    const k = indeksy[i], klucz = (pref << 8) | k;
+    if (pok[klucz] === gen){ pref = tab[klucz]; continue; }
+    wyslij(pref);
+    if (nast === 4096){
+      wyslij(clear); gen++; rozmKodu = minKod + 1; nast = eoi + 1;
+    } else {
+      if (nast >= (1 << rozmKodu)) rozmKodu++;
+      tab[klucz] = nast++; pok[klucz] = gen;
+    }
+    pref = k;
+  }
+  wyslij(pref); wyslij(eoi);
+  if (bity > 0) out.push(akum & 255);
+  return out;
+}
+
+async function zrobGif(klatki, opoznienieMs, postep){
+  const w = klatki[0].width, h = klatki[0].height;
+  const dane = klatki.map(c => c.getContext('2d').getImageData(0, 0, w, h).data);
+  postep('Dobieram kolory...'); await czekaj(0);
+  const { paleta, ileKolorow } = paletaMedianCut(dane, 256);
+  const pamiec = new Int16Array(1 << 18).fill(-1);   // 6 bitów na kanał
+  const najblizszy = (r, g, b) => {
+    const klucz = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
+    let v = pamiec[klucz];
+    if (v >= 0) return v;
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < ileKolorow; i++){
+      const dr = r - paleta[3*i], dg = g - paleta[3*i+1], db = b - paleta[3*i+2];
+      const d = dr*dr*3 + dg*dg*4 + db*db*2;
+      if (d < bd){ bd = d; best = i; }
+    }
+    pamiec[klucz] = best; return best;
+  };
+  const bajty = [];
+  const pisz = (...b) => { for (const x of b) bajty.push(x); };
+  const pisz16 = v => pisz(v & 255, (v >> 8) & 255);
+  for (const ch of 'GIF89a') pisz(ch.charCodeAt(0));
+  pisz16(w); pisz16(h); pisz(0xF7, 0, 0);                         // globalna paleta 256 kolorów
+  for (let i = 0; i < 256; i++) pisz(paleta[3*i] || 0, paleta[3*i+1] || 0, paleta[3*i+2] || 0);
+  pisz(0x21, 0xFF, 11); for (const ch of 'NETSCAPE2.0') pisz(ch.charCodeAt(0)); pisz(3, 1, 0, 0, 0);   // pętla bez końca
+  const cs = Math.max(2, Math.round(opoznienieMs / 10));
+  for (let f = 0; f < dane.length; f++){
+    postep(`Zapisuję GIF... klatka ${f + 1}/${dane.length}`); await czekaj(0);
+    const d = dane[f], n = w * h, ind = new Uint8Array(n);
+    for (let i = 0; i < n; i++) ind[i] = najblizszy(d[4*i], d[4*i+1], d[4*i+2]);
+    pisz(0x21, 0xF9, 4, 0x04, cs & 255, (cs >> 8) & 255, 0, 0);    // czas klatki
+    pisz(0x2C); pisz16(0); pisz16(0); pisz16(w); pisz16(h); pisz(0);
+    pisz(8);
+    const kod = lzw(ind, 8);
+    for (let i = 0; i < kod.length; i += 255){
+      const kawal = kod.slice(i, i + 255);
+      bajty.push(kawal.length); for (const x of kawal) bajty.push(x);
+    }
+    pisz(0);
+  }
+  pisz(0x3B);
+  return new Blob([new Uint8Array(bajty)], { type: 'image/gif' });
+}
+
+$('#animGif').onclick = async () => {
+  const btn = $('#animGif'); btn.disabled = true;
+  try{
+    if (anim.brudne && !(await animBuduj())) return;
+    const blob = await zrobGif(animKolejnosc(), animOpoznienie(), t => $('#animPostep').textContent = t);
+    $('#animPostep').textContent = await zapiszBlob(blob, nazwaAnimacji() + '_360.gif') + ` (${(blob.size / 1048576).toFixed(1)} MB)`;
+  }catch(e){ console.error(e); $('#animPostep').textContent = 'Błąd GIF: ' + e.message; }
+  finally{ btn.disabled = false; }
+};
+
+// ----- film (MP4 jeśli przeglądarka umie, inaczej WebM) -----
+$('#animFilm').onclick = async () => {
+  const btn = $('#animFilm'); btn.disabled = true;
+  try{
+    if (anim.brudne && !(await animBuduj())) return;
+    const typy = ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
+    const typ = typy.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+    if (!typ) throw new Error('ta przeglądarka nie umie nagrywać filmów');
+    const klatki = animKolejnosc(), obroty = +$('#animObroty').value, ms = animOpoznienie();
+    const c = document.createElement('canvas'); c.width = klatki[0].width; c.height = klatki[0].height;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(klatki[0], 0, 0);
+    const strumien = c.captureStream(30);
+    const nagr = new MediaRecorder(strumien, { mimeType: typ, videoBitsPerSecond: 8_000_000 });
+    const kawalki = []; nagr.ondataavailable = e => { if (e.data.size) kawalki.push(e.data); };
+    const koniec = new Promise(r => nagr.onstop = r);
+    nagr.start();
+    const wszystkie = obroty * klatki.length, start = performance.now();
+    for (let i = 0; i < wszystkie; i++){
+      ctx.drawImage(klatki[i % klatki.length], 0, 0);
+      if (i % 6 === 0) $('#animPostep').textContent = `Nagrywam film... ${Math.round(100 * i / wszystkie)}%`;
+      const cel = start + (i + 1) * ms;
+      await czekaj(Math.max(0, cel - performance.now()));
+    }
+    nagr.stop(); await koniec;
+    const roz = typ.startsWith('video/mp4') ? 'mp4' : 'webm';
+    const blob = new Blob(kawalki, { type: typ.split(';')[0] });
+    $('#animPostep').textContent = await zapiszBlob(blob, nazwaAnimacji() + '_360.' + roz) + ` (${(blob.size / 1048576).toFixed(1)} MB)`;
+  }catch(e){ console.error(e); $('#animPostep').textContent = 'Błąd filmu: ' + e.message; }
+  finally{ btn.disabled = false; }
+};
+
 // ---------- Wczytywanie zdjęć ----------
 const drop = $('#drop'), plikInput = $('#plik');
 drop.onclick = () => plikInput.click();
@@ -943,6 +1289,7 @@ $('#sila').oninput = rysujWszystkie;
 $('#dlugosc').oninput = rysujWszystkie;
 document.querySelectorAll('input[name=kier]').forEach(r => r.onchange = rysujWszystkie);
 $('#autoZapis').onchange = zapiszUstawienia;
+$('#wczytaj').onchange = zapiszUstawienia;
 $('#bezAI').onchange = () => $('#jakosc').onchange();
 $('#jakosc').onchange = () => {
   zapiszUstawienia();
