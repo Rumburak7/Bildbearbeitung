@@ -83,6 +83,9 @@
       </select>
     </div>
     <div class="grupa">
+      <label title="Nie usuwa tła – tylko zmienia format, rozmiar albo robi ikonę"><input type="checkbox" id="bezAI"> <b>bez usuwania tła</b> (tylko zmiana formatu)</label>
+    </div>
+    <div class="grupa">
       <span>Tło:</span>
       <label><input type="radio" name="tlo" value="brak" checked> przezroczyste</label>
       <label><input type="radio" name="tlo" value="#ffffff"> białe</label>
@@ -104,6 +107,7 @@
         <option value="png">PNG (przezroczyste)</option>
         <option value="webp">WebP (przezroczyste, mały plik)</option>
         <option value="jpg">JPG (bez przezroczystości)</option>
+        <option value="ico">ICO (ikona Windows, np. dla folderu)</option>
       </select>
       <label id="jakoscPlikuBox">jakość <input type="range" id="jakoscPliku" min="50" max="100" value="90"> <span class="liczba" id="jakoscPlikuTxt"></span></label>
       <select id="wielkosc" title="Dłuższy bok obrazka">
@@ -288,9 +292,12 @@ function utworzKarte(plik){
 async function przetworz(z){
   if (z.usuniete) return;
   try{
-    z.stan('Czekam na model...');
-    await wczytajModel();
-    z.stan('Usuwam tło...');
+    const bezAI = $('#bezAI').checked;
+    if (!bezAI){
+      z.stan('Czekam na model...');
+      await wczytajModel();
+      z.stan('Usuwam tło...');
+    }
     const t0 = performance.now();
     if (!z.oryg){
       const bm = await createImageBitmap(z.plik);
@@ -303,7 +310,8 @@ async function przetworz(z){
       bm.close && bm.close();
     }
     let maska;
-    try{ maska = await liczMaske(z); }
+    if (bezAI) maska = new Uint8Array(z.w * z.h).fill(255);
+    else try{ maska = await liczMaske(z); }
     catch(e){
       if (urzadzenie === 'karta graficzna'){        // karta graficzna nie dała rady -> procesor
         console.warn('Błąd na karcie graficznej, przełączam na procesor', e);
@@ -314,7 +322,7 @@ async function przetworz(z){
     z.alfaKlucz = null;
     z.tloKolor = szacujTlo(z);
     rysuj(z);
-    z.stan(`Gotowe ✔ (${((performance.now()-t0)/1000).toFixed(1)} s)`, 'ok');
+    z.stan(bezAI ? 'Gotowe ✔ (bez usuwania tła)' : `Gotowe ✔ (${((performance.now()-t0)/1000).toFixed(1)} s)`, 'ok');
     z.przyciski(true);
   }catch(e){
     console.error(e);
@@ -572,34 +580,80 @@ document.addEventListener('keydown', e => {
 });
 
 // ---------- Pobieranie ----------
-function pobierz(z){
-  return new Promise(res => {
-    if (!z.wynik) return res();
-    const format = $('#format').value, max = +$('#wielkosc').value, jakosc = $('#jakoscPliku').value / 100;
-    const src = z.wynik;
+const doBloba = (c, typ, q) => new Promise(r => c.toBlob(r, typ, q));
+
+// zmniejszanie w kilku krokach – ładniejsze małe ikonki
+function skaluj(src, w, h){
+  let cur = src;
+  while (cur.width / 2 >= w && cur.height / 2 >= h){
+    const t = document.createElement('canvas');
+    t.width = Math.round(cur.width / 2); t.height = Math.round(cur.height / 2);
+    const tc = t.getContext('2d'); tc.imageSmoothingQuality = 'high';
+    tc.drawImage(cur, 0, 0, t.width, t.height); cur = t;
+  }
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(cur, 0, 0, w, h);
+  return c;
+}
+
+// plik ICO dla Windows: kwadrat, w środku obrazki PNG 256/128/64/48/32/24/16 px
+async function zrobIco(src){
+  const bok = Math.max(src.width, src.height);
+  const kw = document.createElement('canvas'); kw.width = kw.height = bok;
+  const kctx = kw.getContext('2d');
+  const tlo = ustawienia().tlo;
+  if (tlo){ kctx.fillStyle = tlo; kctx.fillRect(0, 0, bok, bok); }
+  kctx.drawImage(src, (bok - src.width) / 2, (bok - src.height) / 2);
+  const rozmiary = [256, 128, 64, 48, 32, 24, 16];
+  const pngi = [];
+  for (const r of rozmiary) pngi.push(new Uint8Array(await (await doBloba(skaluj(kw, r, r), 'image/png')).arrayBuffer()));
+  const naglowek = 6 + 16 * rozmiary.length;
+  const razem = naglowek + pngi.reduce((s, p) => s + p.length, 0);
+  const buf = new ArrayBuffer(razem), v = new DataView(buf), u8 = new Uint8Array(buf);
+  v.setUint16(0, 0, true); v.setUint16(2, 1, true); v.setUint16(4, rozmiary.length, true);
+  let pozycja = naglowek;
+  rozmiary.forEach((r, i) => {
+    const o = 6 + 16 * i;
+    v.setUint8(o, r >= 256 ? 0 : r); v.setUint8(o + 1, r >= 256 ? 0 : r);
+    v.setUint8(o + 2, 0); v.setUint8(o + 3, 0);
+    v.setUint16(o + 4, 1, true); v.setUint16(o + 6, 32, true);
+    v.setUint32(o + 8, pngi[i].length, true); v.setUint32(o + 12, pozycja, true);
+    u8.set(pngi[i], pozycja); pozycja += pngi[i].length;
+  });
+  return new Blob([buf], { type: 'image/x-icon' });
+}
+
+async function pobierz(z){
+  if (!z.wynik) return;
+  const format = $('#format').value, max = +$('#wielkosc').value, jakosc = $('#jakoscPliku').value / 100;
+  const src = z.wynik;
+  let blob;
+  if (format === 'ico'){
+    blob = await zrobIco(src);
+  } else {
     let w = src.width, h = src.height;
     if (max && Math.max(w, h) > max){ const s = max / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    const ctx = c.getContext('2d');
-    ctx.imageSmoothingQuality = 'high';
+    const c = skaluj(src, w, h);
     if (format === 'jpg'){                       // JPG nie ma przezroczystości -> wybrane tło albo białe
-      ctx.fillStyle = ustawienia().tlo || '#ffffff'; ctx.fillRect(0, 0, w, h);
+      const t = document.createElement('canvas'); t.width = w; t.height = h;
+      const tc = t.getContext('2d');
+      tc.fillStyle = ustawienia().tlo || '#ffffff'; tc.fillRect(0, 0, w, h); tc.drawImage(c, 0, 0);
+      blob = await doBloba(t, 'image/jpeg', jakosc);
+    } else {
+      blob = await doBloba(c, format === 'webp' ? 'image/webp' : 'image/png', format === 'webp' ? jakosc : undefined);
     }
-    ctx.drawImage(src, 0, 0, w, h);
-    const typ = { png: 'image/png', webp: 'image/webp', jpg: 'image/jpeg' }[format];
-    c.toBlob(blob => {
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = z.nazwa + '_bez_tla.' + format;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      res();
-    }, typ, format === 'png' ? undefined : jakosc);
-  });
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = z.nazwa + ($('#bezAI').checked ? '' : '_bez_tla') + '.' + format;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 function opcjeZapisu(){
   const f = $('#format').value;
-  $('#jakoscPlikuBox').style.display = f === 'png' ? 'none' : '';
+  $('#jakoscPlikuBox').style.display = (f === 'jpg' || f === 'webp') ? '' : 'none';
+  $('#wielkosc').style.display = f === 'ico' ? 'none' : '';
   $('#jakoscPlikuTxt').textContent = $('#jakoscPliku').value + '%';
   document.querySelectorAll('.pobierz').forEach(b => b.textContent = '⬇ ' + f.toUpperCase());
   try{
@@ -639,6 +693,7 @@ document.querySelectorAll('input[name=tlo]').forEach(r => r.onchange = rysujWszy
 $('#kolor').oninput = () => { document.querySelector('input[name=tlo][value=kolor]').checked = true; rysujWszystkie(); };
 ['#czysc', '#drobne', '#margines'].forEach(s => $(s).oninput = rysujWszystkie);
 ['#poswiata', '#przytnij'].forEach(s => $(s).onchange = rysujWszystkie);
+$('#bezAI').onchange = () => $('#jakosc').onchange();
 $('#jakosc').onchange = () => {
   zapiszUstawienia();
   for (const z of zdjecia){
