@@ -62,6 +62,7 @@
   .panel .opis{min-width:84px}
   .panel .rzad{display:flex;gap:8px}
   .panel .rzad button:first-child{flex:1}
+  .panel .kierunek{justify-content:space-between}
   .akcje button{width:100%}
   .liczba{display:inline-block;min-width:46px;color:var(--szary);font-weight:600}
   #folderNazwa{word-break:break-all}
@@ -147,8 +148,16 @@
         <option value="brak">brak</option>
         <option value="pod">pod obiektem (stoi na stole)</option>
         <option value="rzucony">rzucony (z boku)</option>
+        <option value="oba">oba naraz ⭐ (jak w sklepie)</option>
       </select>
       <label id="silaBox"><span class="opis">siła</span> <input type="range" id="sila" min="10" max="100" value="60"> <span class="liczba" id="silaTxt"></span></label>
+      <div id="rzucBox" style="display:flex;flex-direction:column;gap:12px">
+        <div class="rzad kierunek">
+          <label title="Cień pada w lewo (lampa stoi po prawej)"><input type="radio" name="kier" value="-1"> ⬅️ w lewo</label>
+          <label title="Cień pada w prawo (lampa stoi po lewej)"><input type="radio" name="kier" value="1" checked> w prawo ➡️</label>
+        </div>
+        <label title="Jak daleko sięga cień"><span class="opis">długość</span> <input type="range" id="dlugosc" min="40" max="250" value="100"> <span class="liczba" id="dlugoscTxt"></span></label>
+      </div>
     </div>
     <div class="panel" style="--k:#22c55e" id="folderBox">
       <h3>📁 Folder</h3>
@@ -254,7 +263,8 @@ function zapiszUstawienia(){
     localStorage.setItem(ZAPIS, JSON.stringify({
       jakosc: $('#jakosc').value, czysc: $('#czysc').value, drobne: $('#drobne').value,
       poswiata: $('#poswiata').checked, kolor: $('#kolor').value, margines: $('#margines').value,
-      cien: $('#cien').value, sila: $('#sila').value, autoZapis: $('#autoZapis').checked
+      cien: $('#cien').value, sila: $('#sila').value, autoZapis: $('#autoZapis').checked,
+      kier: document.querySelector('input[name=kier]:checked').value, dlugosc: $('#dlugosc').value
     }));
   }catch(e){}
 }
@@ -268,12 +278,16 @@ try{
   if (s.margines != null) $('#margines').value = s.margines;
   if (s.cien) $('#cien').value = s.cien;
   if (s.sila != null) $('#sila').value = s.sila;
+  if (s.kier) { const r = document.querySelector(`input[name=kier][value="${s.kier}"]`); if (r) r.checked = true; }
+  if (s.dlugosc != null) $('#dlugosc').value = s.dlugosc;
   if (s.autoZapis != null) $('#autoZapis').checked = s.autoZapis;
 }catch(e){}
 function opisySuwakow(){
   $('#czyscTxt').textContent = $('#czysc').value;
   $('#silaTxt').textContent = $('#sila').value + '%';
   $('#silaBox').style.display = $('#cien').value === 'brak' ? 'none' : '';
+  $('#rzucBox').style.display = ($('#cien').value === 'rzucony' || $('#cien').value === 'oba') ? 'flex' : 'none';
+  $('#dlugoscTxt').textContent = '×' + ($('#dlugosc').value / 100).toFixed(1);
   $('#drobneTxt').textContent = ($('#drobne').value / 10).toFixed(1) + '%';
   $('#marginesTxt').textContent = $('#margines').value + '%';
   $('#rozmiarTxt').textContent = $('#rozmiar').value + ' px';
@@ -496,6 +510,8 @@ function ustawienia(){
     przytnij: $('#przytnij').checked,
     cien: $('#cien').value,
     sila: $('#sila').value / 100,
+    kier: +document.querySelector('input[name=kier]:checked').value,
+    dlugosc: $('#dlugosc').value / 100,
     margines: $('#margines').value / 100
   };
 }
@@ -545,22 +561,29 @@ function rysuj(z){
   const bw = maxX - minX + 1, bh = maxY - minY + 1, duzy = Math.max(bw, bh);
 
   // cień – gdzie będzie i jak daleko sięga
-  let cien = null;
+  const cienie = [];
   if (jest && u.cien !== 'brak'){
-    if (u.cien === 'pod'){
+    const oba = u.cien === 'oba';
+    if (u.cien === 'pod' || oba){
       const rx = bw * 0.55, ry = Math.max(4, bw * 0.07);
-      cien = { typ: 'pod', cx: (minX + maxX) / 2, cy: maxY - ry * 0.25, rx, ry,
-               l: (minX + maxX) / 2 - rx, t: maxY - ry, r: (minX + maxX) / 2 + rx, b: maxY + ry };
-    } else {
-      const roz = duzy * 0.025, dx = duzy * 0.035, dy = duzy * 0.045;
-      cien = { typ: 'rzucony', roz, dx, dy, l: minX - 2*roz, t: minY - 2*roz, r: maxX + dx + 2*roz, b: maxY + dy + 2*roz };
+      const cx = (minX + maxX) / 2 + (oba ? u.kier * bw * 0.04 : 0);   // przy "oba" plama lekko w stronę cienia
+      cienie.push({ typ: 'pod', cx, cy: maxY - ry * 0.25, rx, ry, sila: u.sila * (oba ? 0.9 : 1),
+                    l: cx - rx, t: maxY - ry, r: cx + rx, b: maxY + ry });
+    }
+    if (u.cien === 'rzucony' || oba){
+      const k = u.dlugosc;
+      const roz = duzy * (oba ? 0.03 : 0.025) * Math.sqrt(k);
+      const dx = u.kier * duzy * 0.035 * k, dy = duzy * (oba ? 0.02 : 0.045) * k;
+      cienie.push({ typ: 'rzucony', roz, dx, dy, sila: u.sila * (oba ? 0.5 : 1),
+                    l: minX + Math.min(0, dx) - 2*roz, t: minY - 2*roz, r: maxX + Math.max(0, dx) + 2*roz, b: maxY + dy + 2*roz });
     }
   }
+  const cien = cienie.length > 0;
 
   let sx = 0, sy = 0, sw = w, sh = h;
   if (u.przytnij && jest){
     let l = minX, t = minY, r = maxX + 1, b = maxY + 1;
-    if (cien){ l = Math.min(l, cien.l); t = Math.min(t, cien.t); r = Math.max(r, cien.r); b = Math.max(b, cien.b); }
+    for (const q of cienie){ l = Math.min(l, q.l); t = Math.min(t, q.t); r = Math.max(r, q.r); b = Math.max(b, q.b); }
     const m = Math.round(duzy * u.margines);
     sx = Math.floor(l - m); sy = Math.floor(t - m);
     let px = Math.ceil(r + m), py = Math.ceil(b + m);
@@ -570,7 +593,7 @@ function rysuj(z){
   const out = document.createElement('canvas'); out.width = sw; out.height = sh;
   const o = out.getContext('2d');
   if (u.tlo){ o.fillStyle = u.tlo; o.fillRect(0, 0, sw, sh); }
-  if (cien) rysujCien(o, c, cien, u.sila, -sx, -sy);
+  for (const q of cienie) rysujCien(o, c, q, q.sila, -sx, -sy);
   o.drawImage(c, -sx, -sy);
   z.wynik = out;
   const pole = z.karta.querySelector('.wynik');
@@ -917,6 +940,8 @@ $('#kolor').oninput = () => { document.querySelector('input[name=tlo][value=kolo
 ['#czysc', '#drobne', '#margines'].forEach(s => $(s).oninput = rysujWszystkie);
 ['#poswiata', '#przytnij', '#cien'].forEach(s => $(s).onchange = rysujWszystkie);
 $('#sila').oninput = rysujWszystkie;
+$('#dlugosc').oninput = rysujWszystkie;
+document.querySelectorAll('input[name=kier]').forEach(r => r.onchange = rysujWszystkie);
 $('#autoZapis').onchange = zapiszUstawienia;
 $('#bezAI').onchange = () => $('#jakosc').onchange();
 $('#jakosc').onchange = () => {
