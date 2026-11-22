@@ -155,6 +155,10 @@
       <label><input type="radio" name="tlo" value="brak" checked> przezroczyste</label>
       <label><input type="radio" name="tlo" value="#ffffff"> białe</label>
       <label><input type="radio" name="tlo" value="kolor"> kolor <input type="color" id="kolor" value="#e8f0ff"></label>
+      <label title="Płynne przejście między dwoma kolorami"><input type="radio" name="tlo" value="gradient"> gradient <input type="color" id="grad1" value="#ffffff"> <input type="color" id="grad2" value="#9fb8d8">
+        <select id="gradKier" title="Kierunek przejścia"><option value="pion">↕ góra-dół</option><option value="poz">↔ lewo-prawo</option><option value="skos">↘ na skos</option><option value="kolo">◎ od środka</option></select></label>
+      <label title="Własne zdjęcie jako tło, np. drewno albo warsztat"><input type="radio" name="tlo" value="obraz"> moje zdjęcie <button type="button" id="tloWybierz">🖼️ wybierz…</button> <span id="tloNazwa" class="opis"></span></label>
+      <input type="file" id="tloPlik" accept="image/*" hidden>
     </div>
     <div class="panel" style="--k:#14b8a6">
       <h3>✨ Czyszczenie</h3>
@@ -200,6 +204,7 @@
         <option value="webp">WebP (przezroczyste, mały plik)</option>
         <option value="jpg">JPG (bez przezroczystości)</option>
         <option value="ico">ICO (ikona Windows, np. dla folderu)</option>
+        <option value="ikony">Komplet ikon (ZIP: icon-192, icon-512, favicon, iPhone)</option>
       </select>
       <label id="jakoscPlikuBox"><span class="opis">jakość</span> <input type="range" id="jakoscPliku" min="50" max="100" value="90"> <span class="liczba" id="jakoscPlikuTxt"></span></label>
       <select id="wielkosc" title="Dłuższy bok obrazka">
@@ -321,7 +326,8 @@ function zapiszUstawienia(){
       jakosc: $('#jakosc').value, czysc: $('#czysc').value, drobne: $('#drobne').value,
       poswiata: $('#poswiata').checked, kolor: $('#kolor').value, margines: $('#margines').value,
       cien: $('#cien').value, sila: $('#sila').value, autoZapis: $('#autoZapis').checked, wczytaj: $('#wczytaj').value,
-      kier: document.querySelector('input[name=kier]:checked').value, dlugosc: $('#dlugosc').value
+      kier: document.querySelector('input[name=kier]:checked').value, dlugosc: $('#dlugosc').value,
+      g1: $('#grad1').value, g2: $('#grad2').value, gk: $('#gradKier').value
     }));
   }catch(e){}
 }
@@ -339,6 +345,9 @@ try{
   if (s.dlugosc != null) $('#dlugosc').value = s.dlugosc;
   if (s.wczytaj != null) $('#wczytaj').value = s.wczytaj;
   if (s.autoZapis != null) $('#autoZapis').checked = s.autoZapis;
+  if (s.g1) $('#grad1').value = s.g1;
+  if (s.g2) $('#grad2').value = s.g2;
+  if (s.gk) $('#gradKier').value = s.gk;
 }catch(e){}
 function opisySuwakow(){
   $('#czyscTxt').textContent = $('#czysc').value;
@@ -653,10 +662,16 @@ function alfa(z, u){
   return a;
 }
 
+let tloObraz = null;
+function ustawTloObraz(plik, nazwa){
+  return new Promise((ok) => { const im = new Image(); im.onload = () => { tloObraz = im; $('#tloNazwa').textContent = nazwa ? '(' + nazwa.slice(0, 24) + ')' : ''; ok(); }; im.onerror = () => ok(); im.src = URL.createObjectURL(plik); });
+}
 function ustawienia(){
   const wybor = document.querySelector('input[name=tlo]:checked').value;
   return {
-    tlo: wybor === 'brak' ? null : (wybor === 'kolor' ? $('#kolor').value : wybor),
+    tlo: wybor === 'brak' ? null : wybor === 'kolor' ? $('#kolor').value
+       : wybor === 'gradient' ? { typ: 'gradient', a: $('#grad1').value, b: $('#grad2').value, k: $('#gradKier').value }
+       : wybor === 'obraz' ? (tloObraz ? { typ: 'obraz', img: tloObraz } : '#ffffff') : wybor,
     czysc: +$('#czysc').value,
     drobne: +$('#drobne').value,
     poswiata: $('#poswiata').checked,
@@ -850,10 +865,30 @@ function rysujPorownanie(z){
 }
 
 // składa gotowy obrazek z wybranego wycinka (sx, sy, sw, sh)
+// tlo: null (przezroczyste), kolor '#rrggbb', gradient albo wlasne zdjecie (wypelnia cale pole jak „cover”)
+function malujTlo(o, tlo, w, h){
+  if (!tlo) return;
+  if (typeof tlo === 'string'){ o.fillStyle = tlo; o.fillRect(0, 0, w, h); return; }
+  if (tlo.typ === 'gradient'){
+    let g;
+    if (tlo.k === 'kolo') g = o.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.hypot(w, h) / 2);
+    else if (tlo.k === 'poz') g = o.createLinearGradient(0, 0, w, 0);
+    else if (tlo.k === 'skos') g = o.createLinearGradient(0, 0, w, h);
+    else g = o.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, tlo.a); g.addColorStop(1, tlo.b);
+    o.fillStyle = g; o.fillRect(0, 0, w, h); return;
+  }
+  if (tlo.typ === 'obraz' && tlo.img){
+    const iw = tlo.img.naturalWidth || tlo.img.width, ih = tlo.img.naturalHeight || tlo.img.height;
+    const s = Math.max(w / iw, h / ih), dw = iw * s, dh = ih * s;
+    o.fillStyle = '#ffffff'; o.fillRect(0, 0, w, h);
+    o.drawImage(tlo.img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  }
+}
 function skladaj(p, tlo, sx, sy, sw, sh){
   const out = document.createElement('canvas'); out.width = sw; out.height = sh;
   const o = out.getContext('2d');
-  if (tlo){ o.fillStyle = tlo; o.fillRect(0, 0, sw, sh); }
+  malujTlo(o, tlo, sw, sh);
   for (const q of p.cienie) rysujCien(o, p.c, q, q.sila, -sx, -sy);
   o.drawImage(p.c, -sx, -sy);
   return out;
@@ -1047,7 +1082,7 @@ async function zrobIco(src){
   const kw = document.createElement('canvas'); kw.width = kw.height = bok;
   const kctx = kw.getContext('2d');
   const tlo = ustawienia().tlo;
-  if (tlo){ kctx.fillStyle = tlo; kctx.fillRect(0, 0, bok, bok); }
+  malujTlo(kctx, tlo, bok, bok);
   kctx.drawImage(src, (bok - src.width) / 2, (bok - src.height) / 2);
   const rozmiary = [16, 24, 32, 48, 64, 128, 256];   // duży na końcu – Fotos w Windows pokazuje ostatni
   const pngi = [];
@@ -1068,12 +1103,67 @@ async function zrobIco(src){
   return new Blob([buf], { type: 'image/x-icon' });
 }
 
+// komplet ikon do stron (GitHub Pages, ESP): kwadrat z obiektem na srodku, tlo z ustawien
+async function zrobKompletIkon(src){
+  const u = ustawienia(), bok = Math.max(src.width, src.height), marg = Math.round(bok * 0.08);
+  const kw = document.createElement('canvas'); kw.width = kw.height = bok + 2 * marg;
+  const k = kw.getContext('2d');
+  malujTlo(k, u.tlo, kw.width, kw.height);
+  k.drawImage(src, (kw.width - src.width) / 2, (kw.height - src.height) / 2);
+  // iPhone nie lubi przezroczystosci - pod jego ikone zawsze tlo (biale, jesli przezroczyste)
+  const pelne = document.createElement('canvas'); pelne.width = pelne.height = kw.width;
+  const pc = pelne.getContext('2d'); malujTlo(pc, u.tlo || '#ffffff', kw.width, kw.width); pc.drawImage(kw, 0, 0);
+  const png = async (c, r) => new Uint8Array(await (await doBloba(skaluj(c, r, r), 'image/png')).arrayBuffer());
+  const pliki = [
+    ['icon-192.png', await png(kw, 192)],
+    ['icon-512.png', await png(kw, 512)],
+    ['apple-touch-icon.png', await png(pelne, 180)],
+    ['favicon.ico', new Uint8Array(await (await zrobIco(kw)).arrayBuffer())],
+    ['JAK_UZYC.txt', new TextEncoder().encode(
+      'Ikony do strony - Usuwanie tła, autor Adam Bryks\r\n\r\n' +
+      'icon-192.png i icon-512.png - ikony na ekran telefonu (manifest.json)\r\n' +
+      'apple-touch-icon.png - ikona dla iPhone/iPad\r\n' +
+      'favicon.ico - mała ikonka w karcie przeglądarki\r\n\r\n' +
+      'Wgraj pliki obok index.html. W <head> strony:\r\n' +
+      '<link rel="icon" href="favicon.ico">\r\n<link rel="apple-touch-icon" href="apple-touch-icon.png">\r\n<link rel="manifest" href="manifest.json">\r\n')]
+  ];
+  return zrobZip(pliki);
+}
+// prosty ZIP (bez kompresji - PNG i tak sa skompresowane)
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(d){ let c = 0xFFFFFFFF; for (let i = 0; i < d.length; i++) c = CRC[(c ^ d[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function zrobZip(pliki){
+  const czesci = [], centr = []; let poz = 0;
+  const teraz = new Date(), czas = (teraz.getHours() << 11) | (teraz.getMinutes() << 5) | (teraz.getSeconds() >> 1),
+        data = ((teraz.getFullYear() - 1980) << 9) | ((teraz.getMonth() + 1) << 5) | teraz.getDate();
+  for (const [nazwa, dane] of pliki){
+    const n = new TextEncoder().encode(nazwa), crc = crc32(dane);
+    const lh = new DataView(new ArrayBuffer(30 + n.length));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, czas, true); lh.setUint16(12, data, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, dane.length, true); lh.setUint32(22, dane.length, true); lh.setUint16(26, n.length, true); lh.setUint16(28, 0, true);
+    new Uint8Array(lh.buffer).set(n, 30);
+    const ch = new DataView(new ArrayBuffer(46 + n.length));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, czas, true); ch.setUint16(14, data, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, dane.length, true); ch.setUint32(24, dane.length, true); ch.setUint16(28, n.length, true);
+    ch.setUint32(42, poz, true); new Uint8Array(ch.buffer).set(n, 46);
+    czesci.push(lh.buffer, dane); centr.push(ch.buffer); poz += 30 + n.length + dane.length;
+  }
+  const rozm = centr.reduce((s, c) => s + c.byteLength, 0), end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, pliki.length, true); end.setUint16(10, pliki.length, true);
+  end.setUint32(12, rozm, true); end.setUint32(16, poz, true);
+  return new Blob([...czesci, ...centr, end.buffer], { type: 'application/zip' });
+}
 async function zrobPlik(z){
   const format = $('#format').value, max = +$('#wielkosc').value, jakosc = $('#jakoscPliku').value / 100;
   const src = z.wynik;
   let blob;
   if (format === 'ico'){
     blob = await zrobIco(src);
+  } else if (format === 'ikony'){
+    blob = await zrobKompletIkon(src);
+    return { blob, nazwa: z.nazwa + '_ikony.zip' };
   } else {
     let w = src.width, h = src.height;
     if (max && Math.max(w, h) > max){ const s = max / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
@@ -1081,7 +1171,7 @@ async function zrobPlik(z){
     if (format === 'jpg'){                       // JPG nie ma przezroczystości -> wybrane tło albo białe
       const t = document.createElement('canvas'); t.width = w; t.height = h;
       const tc = t.getContext('2d');
-      tc.fillStyle = ustawienia().tlo || '#ffffff'; tc.fillRect(0, 0, w, h); tc.drawImage(c, 0, 0);
+      malujTlo(tc, ustawienia().tlo || '#ffffff', w, h); tc.drawImage(c, 0, 0);
       blob = await doBloba(t, 'image/jpeg', jakosc);
     } else {
       blob = await doBloba(c, format === 'webp' ? 'image/webp' : 'image/png', format === 'webp' ? jakosc : undefined);
@@ -1175,10 +1265,10 @@ async function pobierz(z, prosic = true){
 function opcjeZapisu(){
   const f = $('#format').value;
   $('#jakoscPlikuBox').style.display = (f === 'jpg' || f === 'webp') ? '' : 'none';
-  $('#wielkosc').style.display = f === 'ico' ? 'none' : '';
+  $('#wielkosc').style.display = (f === 'ico' || f === 'ikony') ? 'none' : '';
   $('#jakoscPlikuTxt').textContent = $('#jakoscPliku').value + '%';
   const ikona = (typeof folder !== 'undefined' && folder) ? '💾 ' : '⬇ ';
-  document.querySelectorAll('.pobierz').forEach(b => b.textContent = ikona + f.toUpperCase());
+  document.querySelectorAll('.pobierz').forEach(b => b.textContent = ikona + (f === 'ikony' ? 'IKONY' : f.toUpperCase()));
   $('#pobierzWszystkie').textContent = (typeof folder !== 'undefined' && folder) ? '💾 Zapisz wszystkie' : '⬇ Pobierz wszystkie';
   try{
     localStorage.setItem('usuwanieTla.zapis', JSON.stringify({ f, j: $('#jakoscPliku').value, w: $('#wielkosc').value }));
@@ -1490,6 +1580,17 @@ document.addEventListener('paste', e => {
 // ---------- Opcje ----------
 document.querySelectorAll('input[name=tlo]').forEach(r => r.onchange = rysujWszystkie);
 $('#kolor').oninput = () => { document.querySelector('input[name=tlo][value=kolor]').checked = true; rysujWszystkie(); };
+const wybierzTlo = (v) => { const r = document.querySelector(`input[name=tlo][value=${v}]`); if (r) r.checked = true; };
+['#grad1', '#grad2', '#gradKier'].forEach(id => $(id).addEventListener('input', () => { wybierzTlo('gradient'); zapiszUstawienia(); rysujWszystkie(); }));
+$('#tloWybierz').onclick = (e) => { e.preventDefault(); $('#tloPlik').click(); };
+$('#tloPlik').onchange = async () => {
+  const f = $('#tloPlik').files[0]; if (!f) return;
+  await ustawTloObraz(f, f.name);
+  try{ await bazaZapisz('tloObraz', f); await bazaZapisz('tloNazwa', f.name); }catch(e){}
+  wybierzTlo('obraz'); rysujWszystkie(); $('#tloPlik').value = '';
+};
+document.querySelector('input[name=tlo][value=obraz]').addEventListener('change', () => { if (!tloObraz) $('#tloPlik').click(); });
+(async () => { try{ const b = await bazaCzytaj('tloObraz'); if (b) await ustawTloObraz(b, (await bazaCzytaj('tloNazwa')) || ''); }catch(e){} })();
 ['#czysc', '#drobne', '#margines'].forEach(s => $(s).oninput = rysujWszystkie);
 ['#poswiata', '#przytnij', '#cien'].forEach(s => $(s).onchange = rysujWszystkie);
 $('#sila').oninput = rysujWszystkie;
