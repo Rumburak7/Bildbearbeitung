@@ -445,6 +445,7 @@ function utworzKarte(plik){
         <button data-op="fx" title="Odbicie lustrzane (lewo-prawo)">⇋</button>
         <button data-op="fy" title="Odbicie do góry nogami">⇅</button>
         <label title="Prostowanie krzywego zdjęcia">📐 prostuj <input type="range" data-k="prost" min="-15" max="15" step="0.5" value="0"> <span class="liczba" data-t="prost"></span></label>
+        <label title="Po prostowaniu lekko powiększa zdjęcie, żeby w rogach nie było pustych (białych) miejsc"><input type="checkbox" class="nRogi" checked> bez pustych rogów</label>
       </div>
       <div class="nGrupa">
         <label>☀️ jasność <input type="range" data-k="jas" min="50" max="160" value="100"> <span class="liczba" data-t="jas"></span></label>
@@ -469,7 +470,7 @@ function utworzKarte(plik){
   setTimeout(opcjeZapisu);
 
   const z = { plik, url, karta, nazwa: plik.name.replace(/\.[^.]+$/, ''), maska: null, wynik: null,
-              ops: [], prost: 0, jas: 100, kon: 100, nas: 100, porownaj: false, ciecie: 0.5 };
+              ops: [], prost: 0, bezRogow: true, jas: 100, kon: 100, nas: 100, porownaj: false, ciecie: 0.5 };
   podlaczNarzedzia(z);
   z.stan = (t, k='') => { const s = karta.querySelector('.stan'); s.textContent = t; s.className = 'stan ' + k; };
   z.przyciski = on => { karta.querySelector('.pobierz').disabled = !on; karta.querySelector('.popraw').disabled = !on; };
@@ -504,6 +505,7 @@ function podlaczNarzedzia(z){
   k.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => {
     z[i.dataset.k] = +i.value; pokazWartosci(); przerysuj();
   });
+  k.querySelector('.nRogi').onchange = e => { z.bezRogow = e.target.checked; przerysuj(0); };
   k.querySelector('.nAuto').onclick = () => { if (!z.maska) return; autoKorekta(z); pokazWartosci(); przerysuj(0); };
   k.querySelector('.nReset').onclick = () => {
     if (!z.maska) return;
@@ -518,7 +520,7 @@ function podlaczNarzedzia(z){
       for (let i = inne.ops.length - 1; i >= 0; i--) wykonajOp(inne, odwrotnosc[inne.ops[i]], false);
       inne.ops = [];
       for (const op of z.ops) wykonajOp(inne, op);
-      inne.prost = z.prost; inne.jas = z.jas; inne.kon = z.kon; inne.nas = z.nas;
+      inne.prost = z.prost; inne.bezRogow = z.bezRogow; inne.karta.querySelector('.nRogi').checked = z.bezRogow; inne.jas = z.jas; inne.kon = z.kon; inne.nas = z.nas;
       inne.pokazWartosci(); inne.przerysuj(0);
     }
   };
@@ -751,8 +753,15 @@ function popraw(src, z, zFiltrem){
   ctx.imageSmoothingQuality = 'high';
   if (zFiltrem && (z.jas !== 100 || z.kon !== 100 || z.nas !== 100)) ctx.filter = filtrKorekt(z);
   if (z.prost){
+    const kat = z.prost * Math.PI / 180;
     ctx.translate(c.width / 2, c.height / 2);
-    ctx.rotate(z.prost * Math.PI / 180);
+    ctx.rotate(kat);
+    if (z.bezRogow){
+      // powiększ tak, żeby obrócone zdjęcie zakryło całe pole – bez pustych rogów
+      const w = c.width, h = c.height, sin = Math.abs(Math.sin(kat)), cos = Math.cos(kat);
+      const k = cos + Math.max(w / h, h / w) * sin;
+      ctx.scale(k, k);
+    }
     ctx.translate(-c.width / 2, -c.height / 2);
   }
   ctx.drawImage(src, 0, 0);
