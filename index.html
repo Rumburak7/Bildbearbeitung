@@ -78,6 +78,15 @@
   .pobierz:hover,.popraw:hover{filter:brightness(1.08)}
   .usun:hover{background:#fee2e2;color:#dc2626}
   .obrazy{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .narzedzia{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;margin:-4px 0 14px;padding:10px 14px;border-radius:14px;
+             background:color-mix(in srgb,#06b6d4 var(--tint),var(--karta));border:1.5px solid color-mix(in srgb,#06b6d4 30%,transparent);font-size:15px}
+  .nGrupa{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px}
+  .narzedzia button{padding:7px 12px;font-size:15px}
+  .narzedzia button[data-op]{font-size:20px;padding:3px 12px;min-width:44px}
+  .narzedzia label{display:inline-flex;align-items:center;gap:7px;cursor:pointer;white-space:nowrap}
+  .narzedzia input[type=range]{flex:none;width:120px;accent-color:#0891b2}
+  .porownanie .pole{height:560px}
+  .porownanie canvas{cursor:ew-resize}
   .pole{height:380px;border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1.5px solid var(--ramka);background:var(--pole)}
   .szachownica{background-color:var(--sz1);background-image:linear-gradient(45deg,var(--sz2) 25%,transparent 25%),linear-gradient(-45deg,var(--sz2) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,var(--sz2) 75%),linear-gradient(-45deg,transparent 75%,var(--sz2) 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}
   .pole img,.pole canvas{max-width:100%;max-height:100%;object-fit:contain}
@@ -429,8 +438,29 @@ function utworzKarte(plik){
       <button class="pobierz" disabled>⬇ ${$('#format').value.toUpperCase()}</button>
       <button class="usun" title="Usuń z listy">✕</button>
     </div>
+    <div class="narzedzia" style="display:none">
+      <div class="nGrupa">
+        <button data-op="ccw" title="Obróć w lewo o 90°">↺</button>
+        <button data-op="cw" title="Obróć w prawo o 90°">↻</button>
+        <button data-op="fx" title="Odbicie lustrzane (lewo-prawo)">⇋</button>
+        <button data-op="fy" title="Odbicie do góry nogami">⇅</button>
+        <label title="Prostowanie krzywego zdjęcia">📐 prostuj <input type="range" data-k="prost" min="-15" max="15" step="0.5" value="0"> <span class="liczba" data-t="prost"></span></label>
+      </div>
+      <div class="nGrupa">
+        <label>☀️ jasność <input type="range" data-k="jas" min="50" max="160" value="100"> <span class="liczba" data-t="jas"></span></label>
+        <label>🌓 kontrast <input type="range" data-k="kon" min="50" max="200" value="100"> <span class="liczba" data-t="kon"></span></label>
+        <label>🎨 kolory <input type="range" data-k="nas" min="0" max="200" value="100"> <span class="liczba" data-t="nas"></span></label>
+      </div>
+      <div class="nGrupa">
+        <button class="nAuto" title="Automatycznie popraw jasność i kontrast">✨ Auto</button>
+        <button class="nReset" title="Cofnij obrót i wszystkie korekty">↩️ Reset</button>
+        <button class="nWszystkie" title="Ustaw ten sam obrót, prostowanie i kolory na wszystkich zdjęciach (np. klatki do animacji)">📋 Dla wszystkich</button>
+        <button class="nPorownaj" title="Kreska przed/po – przesuwaj myszką">⇔ Przed / po</button>
+      </div>
+    </div>
+    <div class="porownanie" style="display:none"><div class="pole szachownica"><canvas></canvas></div><div class="podpis">Przesuwaj myszką po zdjęciu – po lewej PRZED, po prawej PO</div></div>
     <div class="obrazy">
-      <div><div class="pole"><img alt=""></div><div class="podpis">Oryginał</div></div>
+      <div><div class="pole przed"><img alt=""></div><div class="podpis">Oryginał</div></div>
       <div><div class="pole szachownica wynik"><div class="krec"></div></div><div class="podpis">Bez tła (kliknij, żeby poprawić)</div></div>
     </div>`;
   karta.querySelector('.nazwa').textContent = plik.name;
@@ -438,7 +468,9 @@ function utworzKarte(plik){
   $('#lista').append(karta);
   setTimeout(opcjeZapisu);
 
-  const z = { plik, url, karta, nazwa: plik.name.replace(/\.[^.]+$/, ''), maska: null, wynik: null };
+  const z = { plik, url, karta, nazwa: plik.name.replace(/\.[^.]+$/, ''), maska: null, wynik: null,
+              ops: [], prost: 0, jas: 100, kon: 100, nas: 100, porownaj: false, ciecie: 0.5 };
+  podlaczNarzedzia(z);
   z.stan = (t, k='') => { const s = karta.querySelector('.stan'); s.textContent = t; s.className = 'stan ' + k; };
   z.przyciski = on => { karta.querySelector('.pobierz').disabled = !on; karta.querySelector('.popraw').disabled = !on; };
   karta.querySelector('.pobierz').onclick = () => pobierz(z);
@@ -450,6 +482,61 @@ function utworzKarte(plik){
     z.usuniete = true; odswiezPrzycisk(); animZmiana();
   };
   return z;
+}
+
+// pasek narzędzi jednego zdjęcia
+function podlaczNarzedzia(z){
+  const k = z.karta;
+  let odl;
+  const przerysuj = (od = 120) => { clearTimeout(odl); odl = setTimeout(() => { rysuj(z); pokazOryginal(z); animZmiana(); }, od); };
+  const pokazWartosci = () => {
+    k.querySelectorAll('input[data-k]').forEach(i => i.value = z[i.dataset.k]);
+    k.querySelector('[data-t=prost]').textContent = (z.prost > 0 ? '+' : '') + z.prost + '°';
+    ['jas', 'kon', 'nas'].forEach(n => k.querySelector(`[data-t=${n}]`).textContent = z[n] + '%');
+  };
+  z.pokazWartosci = pokazWartosci;
+  z.przerysuj = przerysuj;
+  pokazWartosci();
+  k.querySelectorAll('button[data-op]').forEach(b => b.onclick = () => {
+    if (!z.maska) return;
+    wykonajOp(z, b.dataset.op); przerysuj(0);
+  });
+  k.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => {
+    z[i.dataset.k] = +i.value; pokazWartosci(); przerysuj();
+  });
+  k.querySelector('.nAuto').onclick = () => { if (!z.maska) return; autoKorekta(z); pokazWartosci(); przerysuj(0); };
+  k.querySelector('.nReset').onclick = () => {
+    if (!z.maska) return;
+    for (let i = z.ops.length - 1; i >= 0; i--) wykonajOp(z, odwrotnosc[z.ops[i]], false);
+    z.ops = []; z.prost = 0; z.jas = 100; z.kon = 100; z.nas = 100;
+    pokazWartosci(); przerysuj(0);
+  };
+  k.querySelector('.nWszystkie').onclick = () => {
+    for (const inne of zdjecia){
+      if (inne === z || !inne.maska) continue;
+      // cofnij jego obroty i zrób takie same jak tutaj
+      for (let i = inne.ops.length - 1; i >= 0; i--) wykonajOp(inne, odwrotnosc[inne.ops[i]], false);
+      inne.ops = [];
+      for (const op of z.ops) wykonajOp(inne, op);
+      inne.prost = z.prost; inne.jas = z.jas; inne.kon = z.kon; inne.nas = z.nas;
+      inne.pokazWartosci(); inne.przerysuj(0);
+    }
+  };
+  const btnPor = k.querySelector('.nPorownaj');
+  btnPor.onclick = () => {
+    z.porownaj = !z.porownaj;
+    k.querySelector('.porownanie').style.display = z.porownaj ? '' : 'none';
+    k.querySelector('.obrazy').style.display = z.porownaj ? 'none' : '';
+    btnPor.textContent = z.porownaj ? '✖ Zamknij przed / po' : '⇔ Przed / po';
+    btnPor.classList.toggle('wcisniety', z.porownaj);
+    if (z.porownaj) rysuj(z);
+  };
+  const cmp = k.querySelector('.porownanie canvas');
+  cmp.addEventListener('mousemove', e => {
+    const r = cmp.getBoundingClientRect();
+    z.ciecie = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    rysujPorownanie(z);
+  });
 }
 
 async function przetworz(z){
@@ -490,6 +577,7 @@ async function przetworz(z){
     rysuj(z);
     z.stan(bezAI ? 'Gotowe ✔ (bez usuwania tła)' : `Gotowe ✔ (${((performance.now()-t0)/1000).toFixed(1)} s)`, 'ok');
     z.przyciski(true);
+    z.karta.querySelector('.narzedzia').style.display = '';
     if (folder && $('#autoZapis').checked) await pobierz(z, false);
   }catch(e){
     console.error(e);
@@ -605,14 +693,20 @@ function liczPiksele(z, u, d, x0, y0, x1, y1, czerwone){
 // liczy obiekt bez kadrowania: płótno w pełnym rozmiarze, granice obiektu i cienie
 function przygotuj(z, u){
   const { w, h } = z;
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  let c = document.createElement('canvas'); c.width = w; c.height = h;
   const ctx = c.getContext('2d');
   const obraz = ctx.createImageData(w, h);
   liczPiksele(z, u, obraz.data, 0, 0, w, h, false);
   ctx.putImageData(obraz, 0, 0);
 
+  // jasność / kontrast / kolory i prostowanie
+  let d = obraz.data;
+  if (maKorekty(z)){
+    c = popraw(c, z, true);
+    d = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+  }
+
   // granice obiektu
-  const d = obraz.data;
   let minX = w, minY = h, maxX = -1, maxY = -1;
   for (let y = 0; y < h; y++){
     const wiersz = y * w;
@@ -647,6 +741,105 @@ function przygotuj(z, u){
   return { c, w, h, jest, duzy, cienie, l, t, r, b };
 }
 
+// ---------- Korekty zdjęcia (obrót, odbicie, prostowanie, jasność...) ----------
+function maKorekty(z){ return z.prost || z.jas !== 100 || z.kon !== 100 || z.nas !== 100; }
+function filtrKorekt(z){ return `brightness(${z.jas}%) contrast(${z.kon}%) saturate(${z.nas}%)`; }
+// zFiltrem = false -> tylko prostowanie (dla zdjęcia „przed”)
+function popraw(src, z, zFiltrem){
+  const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  if (zFiltrem && (z.jas !== 100 || z.kon !== 100 || z.nas !== 100)) ctx.filter = filtrKorekt(z);
+  if (z.prost){
+    ctx.translate(c.width / 2, c.height / 2);
+    ctx.rotate(z.prost * Math.PI / 180);
+    ctx.translate(-c.width / 2, -c.height / 2);
+  }
+  ctx.drawImage(src, 0, 0);
+  return c;
+}
+// obrót o 90° / odbicie – przestawia piksele, AI nie musi liczyć od nowa
+function przeksztalc(arr, w, h, ch, op){
+  const src = ch === 4 ? new Uint32Array(arr.buffer, arr.byteOffset, w * h) : arr;
+  const out = ch === 4 ? new Uint32Array(w * h) : new arr.constructor(w * h);
+  const nw = (op === 'cw' || op === 'ccw') ? h : w;
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < w; x++){
+      let nx, ny;
+      if (op === 'cw'){ nx = h - 1 - y; ny = x; }
+      else if (op === 'ccw'){ nx = y; ny = w - 1 - x; }
+      else if (op === 'fx'){ nx = w - 1 - x; ny = y; }
+      else { nx = x; ny = h - 1 - y; }
+      out[ny * nw + nx] = src[y * w + x];
+    }
+  }
+  return ch === 4 ? new Uint8ClampedArray(out.buffer) : out;
+}
+const odwrotnosc = { cw: 'ccw', ccw: 'cw', fx: 'fx', fy: 'fy' };
+function wykonajOp(z, op, zapisz = true){
+  z.oryg = przeksztalc(z.oryg, z.w, z.h, 4, op);
+  z.maska = przeksztalc(z.maska, z.w, z.h, 1, op);
+  z.reczne = przeksztalc(z.reczne, z.w, z.h, 1, op);
+  if (op === 'cw' || op === 'ccw'){ const t = z.w; z.w = z.h; z.h = t; }
+  z.alfaKlucz = null;
+  if (zapisz) z.ops.push(op);
+}
+// zdjęcie „przed” (oryginał po obrocie i prostowaniu)
+function obrazOryg(z){
+  const c = document.createElement('canvas'); c.width = z.w; c.height = z.h;
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(z.oryg), z.w, z.h), 0, 0);
+  return z.prost ? popraw(c, z, false) : c;
+}
+function pokazOryginal(z){
+  const pole = z.karta.querySelector('.przed');
+  pole.innerHTML = '';
+  if (!z.ops.length && !z.prost){ const img = new Image(); img.src = z.url; pole.appendChild(img); }
+  else pole.appendChild(obrazOryg(z));
+}
+// automatyczna jasność/kontrast z jasnych i ciemnych miejsc obiektu
+function autoKorekta(z){
+  const a = alfa(z, ustawienia()), o = z.oryg, n = z.w * z.h, krok = Math.max(1, Math.floor(n / 150000));
+  const jas = [];
+  for (let i = 0; i < n; i += krok) if (a[i] > 128) jas.push((0.299 * o[4*i] + 0.587 * o[4*i+1] + 0.114 * o[4*i+2]) / 255);
+  if (jas.length < 100) return;
+  jas.sort((x, y) => x - y);
+  const p2 = jas[Math.floor(jas.length * 0.02)], p98 = jas[Math.floor(jas.length * 0.98)];
+  if (p98 - p2 < 0.05) return;
+  const b = Math.min(1.6, Math.max(0.6, 1 / (p98 + p2)));
+  const k = Math.min(2, Math.max(0.6, (p98 + p2) / (p98 - p2)));
+  z.jas = Math.round(b * 100); z.kon = Math.round(k * 100);
+  if (z.nas === 100) z.nas = 110;
+}
+
+// ---------- Porównanie przed / po ----------
+function rysujPorownanie(z){
+  if (!z.porownaj || !z.cmpPrzed) return;
+  const c = z.karta.querySelector('.porownanie canvas');
+  if (c.width !== z.w || c.height !== z.h){ c.width = z.w; c.height = z.h; }
+  const ctx = c.getContext('2d'), cut = Math.round(z.w * z.ciecie);
+  ctx.clearRect(0, 0, z.w, z.h);
+  ctx.drawImage(z.cmpPo, 0, 0);
+  if (cut > 0) ctx.drawImage(z.cmpPrzed, 0, 0, cut, z.h, 0, 0, cut, z.h);
+  const g = Math.max(2, Math.round(z.w / 300));
+  ctx.fillStyle = '#fff'; ctx.fillRect(cut - g, 0, g * 2, z.h);
+  ctx.fillStyle = '#db2777'; ctx.fillRect(cut - g / 3, 0, g / 1.5, z.h);
+  // kółko z strzałkami na środku kreski
+  const r = Math.max(14, z.w / 45);
+  ctx.beginPath(); ctx.arc(cut, z.h / 2, r, 0, Math.PI * 2); ctx.fillStyle = '#db2777'; ctx.fill();
+  ctx.lineWidth = g; ctx.strokeStyle = '#fff'; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = `bold ${Math.round(r)}px Segoe UI, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('⇔', cut, z.h / 2 + 1);
+  const f = Math.max(14, Math.round(z.w / 40));
+  ctx.font = `bold ${f}px Segoe UI, sans-serif`; ctx.textBaseline = 'top';
+  const etykieta = (t, x, al) => {
+    ctx.textAlign = al; const m = ctx.measureText(t).width, px = al === 'left' ? x : x - m;
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(px - f * 0.4, f * 0.5, m + f * 0.8, f * 1.5);
+    ctx.fillStyle = '#fff'; ctx.fillText(t, x, f * 0.75);
+  };
+  if (cut > f * 4) etykieta('PRZED', f * 0.8, 'left');
+  if (z.w - cut > f * 4) etykieta('PO', z.w - f * 0.8, 'right');
+}
+
 // składa gotowy obrazek z wybranego wycinka (sx, sy, sw, sh)
 function skladaj(p, tlo, sx, sy, sw, sh){
   const out = document.createElement('canvas'); out.width = sw; out.height = sh;
@@ -671,6 +864,11 @@ function rysuj(z){
   z.wynik = skladaj(p, u.tlo, sx, sy, sw, sh);
   const pole = z.karta.querySelector('.wynik');
   pole.innerHTML = ''; pole.appendChild(z.wynik);
+  if (z.porownaj){
+    z.cmpPo = skladaj(p, u.tlo, 0, 0, w, h);
+    z.cmpPrzed = obrazOryg(z);
+    rysujPorownanie(z);
+  }
 }
 
 function rysujCien(o, c, s, sila, ox, oy){
