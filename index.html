@@ -760,7 +760,7 @@ function skaluj(src, w, h){
   return c;
 }
 
-// plik ICO dla Windows: kwadrat, w środku obrazki PNG 256/128/64/48/32/24/16 px
+// plik ICO dla Windows: kwadrat, w środku obrazki PNG 16/24/32/48/64/128/256 px
 async function zrobIco(src){
   const bok = Math.max(src.width, src.height);
   const kw = document.createElement('canvas'); kw.width = kw.height = bok;
@@ -768,7 +768,7 @@ async function zrobIco(src){
   const tlo = ustawienia().tlo;
   if (tlo){ kctx.fillStyle = tlo; kctx.fillRect(0, 0, bok, bok); }
   kctx.drawImage(src, (bok - src.width) / 2, (bok - src.height) / 2);
-  const rozmiary = [256, 128, 64, 48, 32, 24, 16];
+  const rozmiary = [16, 24, 32, 48, 64, 128, 256];   // duży na końcu – Fotos w Windows pokazuje ostatni
   const pngi = [];
   for (const r of rozmiary) pngi.push(new Uint8Array(await (await doBloba(skaluj(kw, r, r), 'image/png')).arrayBuffer()));
   const naglowek = 6 + 16 * rozmiary.length;
