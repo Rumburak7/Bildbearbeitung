@@ -7,68 +7,99 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✂️</text></svg>">
 <style>
   :root{
-    --bg:#f4f5f7; --karta:#fff; --tekst:#1f2933; --szary:#6b7280;
-    --akcent:#2563eb; --akcent2:#1d4ed8; --ramka:#d9dde3; --ok:#15803d; --blad:#b91c1c;
-    --hover:#eef1f5; --wcisn:#dbe7ff; --nad:#eef4ff; --pole:#fafafa; --sz1:#fff; --sz2:#ddd; --przerywana:#9aa5b1;
+    --bg:#f3f0ff; --karta:#ffffff; --tekst:#1e1b2e; --szary:#6b6585;
+    --akcent:#7c3aed; --akcent2:#6d28d9; --ramka:#e2dcf5; --ok:#15803d; --blad:#dc2626;
+    --hover:#f1ecff; --wcisn:#ede4ff; --nad:#efe7ff; --pole:#faf8ff; --sz1:#fff; --sz2:#e3e0ea; --przerywana:#a78bfa;
+    --tint:10%; --cien:0 6px 24px rgba(91,33,182,.10);
     color-scheme:light;
   }
   :root[data-motyw=ciemny]{
-    --bg:#14171c; --karta:#1e2229; --tekst:#e5e7eb; --szary:#9aa3ae;
-    --akcent:#3b82f6; --akcent2:#60a5fa; --ramka:#343a44; --ok:#4ade80; --blad:#f87171;
-    --hover:#2a3039; --wcisn:#1e3a6b; --nad:#1b2a44; --pole:#171a20; --sz1:#2b3038; --sz2:#3a404a; --przerywana:#4b5563;
+    --bg:#110f1a; --karta:#1c1929; --tekst:#ece9f7; --szary:#a29cbd;
+    --akcent:#a78bfa; --akcent2:#c4b5fd; --ramka:#332d4a; --ok:#4ade80; --blad:#f87171;
+    --hover:#2a2540; --wcisn:#3b2f66; --nad:#2a2148; --pole:#15131f; --sz1:#2a2638; --sz2:#383349; --przerywana:#6d5bb5;
+    --tint:16%; --cien:0 6px 24px rgba(0,0,0,.35);
     color-scheme:dark;
   }
-  #motyw{margin-left:auto;font-size:15px}
   *{box-sizing:border-box}
-  body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--tekst)}
-  header{display:flex;align-items:center;gap:20px;padding:14px 28px;background:var(--karta);border-bottom:1px solid var(--ramka);position:sticky;top:0;z-index:5}
-  header h1{margin:0;font-size:22px}
-  #status{font-size:14px;color:var(--szary)}
-  #status.ok{color:var(--ok)} #status.blad{color:var(--blad)}
-  main{max-width:1300px;margin:0 auto;padding:22px 28px}
-  #drop{border:2px dashed var(--przerywana);border-radius:14px;background:var(--karta);padding:34px;text-align:center;font-size:17px;color:var(--szary);transition:.15s;cursor:pointer}
-  #drop.nad{border-color:var(--akcent);background:var(--nad);color:var(--akcent)}
-  #drop b{color:var(--tekst)}
-  button,select{font:inherit;font-size:14px;padding:7px 13px;border-radius:8px;border:1px solid var(--ramka);background:var(--karta);cursor:pointer;color:var(--tekst)}
-  button:hover{background:var(--hover)}
-  button.glowny{background:var(--akcent);border-color:var(--akcent);color:#fff}
-  button.glowny:hover{background:var(--akcent2)}
-  button.wcisniety{background:var(--wcisn);border-color:var(--akcent);color:var(--akcent2);font-weight:600}
-  button:disabled{opacity:.5;cursor:default}
-  #opcje{display:flex;flex-wrap:wrap;align-items:center;gap:14px 26px;margin:18px 0;padding:14px 18px;background:var(--karta);border:1px solid var(--ramka);border-radius:12px;font-size:14px}
-  #opcje label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
-  .grupa{display:flex;align-items:center;gap:12px}
-  .grupa>span{font-weight:600}
-  input[type=color]{width:34px;height:26px;border:none;padding:0;background:none;cursor:pointer}
-  input[type=range]{width:120px}
-  .liczba{display:inline-block;min-width:38px;color:var(--szary)}
-  .odstep{flex:1}
-  #lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(560px,1fr));gap:18px}
-  .karta{background:var(--karta);border:1px solid var(--ramka);border-radius:12px;padding:12px}
-  .gora{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-  .nazwa{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .stan{font-size:13px;color:var(--szary)}
+  html{font-size:17px}
+  body{margin:0;font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--tekst);
+       background-image:radial-gradient(circle at 0% 0%,color-mix(in srgb,#ec4899 12%,transparent),transparent 40%),radial-gradient(circle at 100% 0%,color-mix(in srgb,#3b82f6 12%,transparent),transparent 40%);background-attachment:fixed}
+  header{display:flex;align-items:center;gap:24px;padding:18px 36px;position:sticky;top:0;z-index:5;
+         background:linear-gradient(100deg,#7c3aed,#db2777 45%,#f59e0b);color:#fff;box-shadow:0 4px 20px rgba(124,58,237,.35)}
+  header h1{margin:0;font-size:32px;letter-spacing:.3px;text-shadow:0 2px 6px rgba(0,0,0,.25)}
+  #status{font-size:16px;color:#fff;background:rgba(255,255,255,.18);padding:6px 14px;border-radius:999px}
+  #status.ok{background:rgba(22,163,74,.55)} #status.blad{background:rgba(220,38,38,.65)}
+  #motyw{margin-left:auto;font-size:17px;background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.45);color:#fff}
+  #motyw:hover{background:rgba(255,255,255,.32)}
+  main{max-width:1700px;margin:0 auto;padding:28px 36px}
+
+  #drop{border:3px dashed var(--przerywana);border-radius:20px;padding:40px;text-align:center;font-size:21px;color:var(--szary);transition:.15s;cursor:pointer;
+        background:linear-gradient(135deg,color-mix(in srgb,#8b5cf6 var(--tint),var(--karta)),color-mix(in srgb,#ec4899 var(--tint),var(--karta)) 50%,color-mix(in srgb,#f59e0b var(--tint),var(--karta)))}
+  #drop::before{content:"🖼️";display:block;font-size:52px;margin-bottom:8px}
+  #drop:hover{transform:scale(1.005);border-color:var(--akcent)}
+  #drop.nad{border-color:#db2777;background:var(--nad);color:var(--akcent)}
+  #drop b{color:var(--tekst);font-size:24px}
+
+  button,select{font:inherit;font-size:16px;padding:10px 18px;border-radius:12px;border:1.5px solid var(--ramka);background:var(--karta);cursor:pointer;color:var(--tekst);transition:.12s}
+  button:hover{background:var(--hover);transform:translateY(-1px)}
+  button.glowny{background:linear-gradient(135deg,#7c3aed,#db2777);border-color:transparent;color:#fff;font-weight:600;box-shadow:0 4px 14px rgba(219,39,119,.35)}
+  button.glowny:hover{filter:brightness(1.08)}
+  button.duzy{font-size:19px;padding:14px 20px}
+  button.wcisniety{background:var(--wcisn);border-color:var(--akcent);color:var(--akcent2);font-weight:700}
+  button:disabled{opacity:.45;cursor:default;transform:none;filter:none}
+  input[type=checkbox],input[type=radio]{width:20px;height:20px;accent-color:var(--k,var(--akcent));cursor:pointer}
+  input[type=color]{width:42px;height:32px;border:none;padding:0;background:none;cursor:pointer}
+  input[type=range]{flex:1;min-width:110px;accent-color:var(--k,var(--akcent));cursor:pointer}
+  small{color:var(--szary)}
+
+  #opcje{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin:24px 0}
+  .panel{display:flex;flex-direction:column;gap:12px;padding:16px 18px 18px;border-radius:18px;font-size:16px;
+         background:color-mix(in srgb,var(--k) var(--tint),var(--karta));border:1.5px solid color-mix(in srgb,var(--k) 35%,transparent);
+         border-top:6px solid var(--k);box-shadow:var(--cien)}
+  .panel h3{margin:0 0 2px;font-size:19px;color:color-mix(in srgb,var(--k) 75%,var(--tekst))}
+  .panel label{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .panel select{width:100%}
+  .panel .opis{min-width:84px}
+  .panel .rzad{display:flex;gap:8px}
+  .panel .rzad button:first-child{flex:1}
+  .akcje button{width:100%}
+  .liczba{display:inline-block;min-width:46px;color:var(--szary);font-weight:600}
+  #folderNazwa{word-break:break-all}
+
+  #lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(760px,1fr));gap:22px}
+  .karta{background:var(--karta);border:1.5px solid var(--ramka);border-radius:20px;padding:16px;box-shadow:var(--cien)}
+  .gora{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .nazwa{font-weight:700;font-size:18px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .stan{font-size:15px;color:var(--szary);font-weight:600}
   .stan.ok{color:var(--ok)} .stan.blad{color:var(--blad)}
-  .obrazy{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .pole{height:260px;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1px solid var(--ramka);background:var(--pole)}
-  .szachownica{background-color:var(--sz1);background-image:linear-gradient(45deg,var(--sz2) 25%,transparent 25%),linear-gradient(-45deg,var(--sz2) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,var(--sz2) 75%),linear-gradient(-45deg,transparent 75%,var(--sz2) 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0}
+  .pobierz{background:linear-gradient(135deg,#3b82f6,#06b6d4);border-color:transparent;color:#fff;font-weight:600}
+  .popraw{background:linear-gradient(135deg,#f59e0b,#f97316);border-color:transparent;color:#fff;font-weight:600}
+  .pobierz:hover,.popraw:hover{filter:brightness(1.08)}
+  .usun:hover{background:#fee2e2;color:#dc2626}
+  .obrazy{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .pole{height:380px;border-radius:14px;display:flex;align-items:center;justify-content:center;overflow:hidden;border:1.5px solid var(--ramka);background:var(--pole)}
+  .szachownica{background-color:var(--sz1);background-image:linear-gradient(45deg,var(--sz2) 25%,transparent 25%),linear-gradient(-45deg,var(--sz2) 25%,transparent 25%),linear-gradient(45deg,transparent 75%,var(--sz2) 75%),linear-gradient(-45deg,transparent 75%,var(--sz2) 75%);background-size:22px 22px;background-position:0 0,0 11px,11px -11px,-11px 0}
   .pole img,.pole canvas{max-width:100%;max-height:100%;object-fit:contain}
   .wynik canvas{cursor:pointer}
-  .podpis{font-size:12px;color:var(--szary);text-align:center;margin-top:4px}
-  .krec{width:34px;height:34px;border:4px solid var(--ramka);border-top-color:var(--akcent);border-radius:50%;animation:krec 1s linear infinite}
+  .podpis{font-size:14px;color:var(--szary);text-align:center;margin-top:6px}
+  .krec{width:48px;height:48px;border:5px solid var(--ramka);border-top-color:#db2777;border-right-color:#7c3aed;border-radius:50%;animation:krec 1s linear infinite}
   @keyframes krec{to{transform:rotate(360deg)}}
-  footer{text-align:center;color:var(--szary);font-size:13px;padding:26px}
+  footer{text-align:center;color:var(--szary);font-size:15px;padding:30px}
+  footer b{background:linear-gradient(90deg,#7c3aed,#db2777);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+  @media (max-width:1300px){ #opcje{grid-template-columns:repeat(2,1fr)} }
 
   /* ---- edytor ręczny ---- */
-  #edytor{position:fixed;inset:0;background:rgba(20,24,31,.92);z-index:20;display:none;flex-direction:column}
+  #edytor{position:fixed;inset:0;background:rgba(17,15,26,.94);z-index:20;display:none;flex-direction:column}
   #edytor.otwarty{display:flex}
-  #edPasek{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 18px;background:var(--karta);font-size:14px}
-  #edPasek label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
-  #edPasek .tytul{font-weight:700;font-size:16px;margin-right:6px}
-  #edObszar{flex:1;overflow:auto;display:flex;align-items:safe center;justify-content:safe center;padding:20px}
+  #edPasek{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:12px 22px;font-size:16px;background:var(--karta);border-bottom:5px solid;border-image:linear-gradient(90deg,#7c3aed,#db2777,#f59e0b) 1}
+  #edPasek label{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+  #edPasek input[type=range]{flex:none;width:160px}
+  #edPasek .tytul{font-weight:700;font-size:20px;margin-right:6px}
+  #edObszar{flex:1;overflow:auto;display:flex;align-items:safe center;justify-content:safe center;padding:24px}
   #edCanvas{display:block;box-shadow:0 4px 30px rgba(0,0,0,.5);cursor:none}
   #pedzel{position:fixed;pointer-events:none;border:2px solid #fff;outline:1px solid #000;border-radius:50%;transform:translate(-50%,-50%);display:none;z-index:30}
-  #edPomoc{color:#cbd2d9;font-size:13px;text-align:center;padding:6px}
+  #edPomoc{color:#cbc5e0;font-size:15px;text-align:center;padding:8px}
 </style>
 </head>
 <body>
@@ -85,57 +116,58 @@
   </section>
 
   <section id="opcje">
-    <div class="grupa">
-      <span>Model AI:</span>
+    <div class="panel" style="--k:#8b5cf6">
+      <h3>🤖 Model AI</h3>
       <select id="jakosc">
         <option value="fp32">dokładny (ok. 175 MB)</option>
         <option value="q8">szybki (ok. 45 MB)</option>
       </select>
+      <label title="Nie usuwa tła – tylko zmienia format, rozmiar albo robi ikonę"><input type="checkbox" id="bezAI"> <span>bez usuwania tła<br><small>(tylko zmiana formatu)</small></span></label>
     </div>
-    <div class="grupa">
-      <label title="Nie usuwa tła – tylko zmienia format, rozmiar albo robi ikonę"><input type="checkbox" id="bezAI"> <b>bez usuwania tła</b> (tylko zmiana formatu)</label>
-    </div>
-    <div class="grupa">
-      <span>Tło:</span>
+    <div class="panel" style="--k:#ec4899">
+      <h3>🎨 Tło</h3>
       <label><input type="radio" name="tlo" value="brak" checked> przezroczyste</label>
       <label><input type="radio" name="tlo" value="#ffffff"> białe</label>
       <label><input type="radio" name="tlo" value="kolor"> kolor <input type="color" id="kolor" value="#e8f0ff"></label>
     </div>
-    <div class="grupa">
-      <span>Czyszczenie:</span>
-      <label title="Usuwa mgiełkę tła i wyostrza brzegi">krawędzie <input type="range" id="czysc" min="0" max="100" value="50"> <span class="liczba" id="czyscTxt"></span></label>
-      <label title="Usuwa małe śmieci obok obiektu i zatyka małe dziurki w obiekcie">drobiazgi <input type="range" id="drobne" min="0" max="10" value="3"> <span class="liczba" id="drobneTxt"></span></label>
+    <div class="panel" style="--k:#14b8a6">
+      <h3>✨ Czyszczenie</h3>
+      <label title="Usuwa mgiełkę tła i wyostrza brzegi"><span class="opis">krawędzie</span> <input type="range" id="czysc" min="0" max="100" value="50"> <span class="liczba" id="czyscTxt"></span></label>
+      <label title="Usuwa małe śmieci obok obiektu i zatyka małe dziurki w obiekcie"><span class="opis">drobiazgi</span> <input type="range" id="drobne" min="0" max="10" value="3"> <span class="liczba" id="drobneTxt"></span></label>
       <label title="Usuwa jasną/ciemną obwódkę tła na brzegach"><input type="checkbox" id="poswiata" checked> bez poświaty</label>
     </div>
-    <div class="grupa">
-      <label><input type="checkbox" id="przytnij"> Przytnij do obiektu</label>
-      <label>margines <input type="range" id="margines" min="0" max="25" value="5"> <span class="liczba" id="marginesTxt"></span></label>
+    <div class="panel" style="--k:#f59e0b">
+      <h3>📐 Kadr</h3>
+      <label><input type="checkbox" id="przytnij"> przytnij do obiektu</label>
+      <label><span class="opis">margines</span> <input type="range" id="margines" min="0" max="25" value="5"> <span class="liczba" id="marginesTxt"></span></label>
     </div>
-    <div class="grupa">
-      <span>Cień:</span>
+    <div class="panel" style="--k:#6366f1">
+      <h3>🌗 Cień</h3>
       <select id="cien" title="Cień pod wyciętym obiektem">
         <option value="brak">brak</option>
         <option value="pod">pod obiektem (stoi na stole)</option>
         <option value="rzucony">rzucony (z boku)</option>
       </select>
-      <label id="silaBox">siła <input type="range" id="sila" min="10" max="100" value="60"> <span class="liczba" id="silaTxt"></span></label>
+      <label id="silaBox"><span class="opis">siła</span> <input type="range" id="sila" min="10" max="100" value="60"> <span class="liczba" id="silaTxt"></span></label>
     </div>
-    <div class="grupa" id="folderBox">
-      <span>Folder:</span>
-      <button id="wybierzFolder" title="Zdjęcia będą zapisywane prosto do tego folderu (np. w OneDrive)">📁 Wybierz folder</button>
+    <div class="panel" style="--k:#22c55e" id="folderBox">
+      <h3>📁 Folder</h3>
+      <div class="rzad">
+        <button id="wybierzFolder" title="Zdjęcia będą zapisywane prosto do tego folderu (np. w OneDrive)">📁 Wybierz folder</button>
+        <button id="zapomnijFolder" title="Wróć do zwykłego pobierania" style="display:none">✕</button>
+      </div>
       <span id="folderNazwa" class="liczba">pobieranie do „Downloads”</span>
-      <button id="zapomnijFolder" title="Wróć do zwykłego pobierania" style="display:none">✕</button>
       <label id="autoZapisBox" style="display:none" title="Każde zdjęcie zapisze się samo, gdy tylko tło zostanie usunięte"><input type="checkbox" id="autoZapis"> zapisuj od razu</label>
     </div>
-    <div class="grupa">
-      <span>Zapis:</span>
+    <div class="panel" style="--k:#3b82f6">
+      <h3>💾 Zapis</h3>
       <select id="format" title="PNG i WebP zachowują przezroczystość, JPG nie">
         <option value="png">PNG (przezroczyste)</option>
         <option value="webp">WebP (przezroczyste, mały plik)</option>
         <option value="jpg">JPG (bez przezroczystości)</option>
         <option value="ico">ICO (ikona Windows, np. dla folderu)</option>
       </select>
-      <label id="jakoscPlikuBox">jakość <input type="range" id="jakoscPliku" min="50" max="100" value="90"> <span class="liczba" id="jakoscPlikuTxt"></span></label>
+      <label id="jakoscPlikuBox"><span class="opis">jakość</span> <input type="range" id="jakoscPliku" min="50" max="100" value="90"> <span class="liczba" id="jakoscPlikuTxt"></span></label>
       <select id="wielkosc" title="Dłuższy bok obrazka">
         <option value="0">rozmiar oryginalny</option>
         <option value="3000">max 3000 px</option>
@@ -146,16 +178,18 @@
         <option value="500">max 500 px</option>
       </select>
     </div>
-    <div class="odstep"></div>
-    <button id="wyczysc">Wyczyść listę</button>
-    <button class="glowny" id="pobierzWszystkie" disabled>⬇ Pobierz wszystkie</button>
+    <div class="panel akcje" style="--k:#f43f5e">
+      <h3>🚀 Gotowe zdjęcia</h3>
+      <button class="glowny duzy" id="pobierzWszystkie" disabled>⬇ Pobierz wszystkie</button>
+      <button id="wyczysc">🗑️ Wyczyść listę</button>
+    </div>
   </section>
 
   <section id="lista"></section>
 </main>
 
 <footer>
-  Usuwanie tła - autor Adam Bryks 2026<br>
+  <b>Usuwanie tła - autor Adam Bryks 2026</b><br>
   Wszystko liczy się w Twojej przeglądarce. Zdjęcia nie są nigdzie wysyłane. Model AI: BRIA RMBG-1.4 (do użytku prywatnego).
 </footer>
 
