@@ -98,6 +98,24 @@
       <label><input type="checkbox" id="przytnij"> Przytnij do obiektu</label>
       <label>margines <input type="range" id="margines" min="0" max="25" value="5"> <span class="liczba" id="marginesTxt"></span></label>
     </div>
+    <div class="grupa">
+      <span>Zapis:</span>
+      <select id="format" title="PNG i WebP zachowują przezroczystość, JPG nie">
+        <option value="png">PNG (przezroczyste)</option>
+        <option value="webp">WebP (przezroczyste, mały plik)</option>
+        <option value="jpg">JPG (bez przezroczystości)</option>
+      </select>
+      <label id="jakoscPlikuBox">jakość <input type="range" id="jakoscPliku" min="50" max="100" value="90"> <span class="liczba" id="jakoscPlikuTxt"></span></label>
+      <select id="wielkosc" title="Dłuższy bok obrazka">
+        <option value="0">rozmiar oryginalny</option>
+        <option value="3000">max 3000 px</option>
+        <option value="2000">max 2000 px</option>
+        <option value="1500">max 1500 px</option>
+        <option value="1000">max 1000 px</option>
+        <option value="800">max 800 px</option>
+        <option value="500">max 500 px</option>
+      </select>
+    </div>
     <div class="odstep"></div>
     <button id="wyczysc">Wyczyść listę</button>
     <button class="glowny" id="pobierzWszystkie" disabled>⬇ Pobierz wszystkie</button>
@@ -242,7 +260,7 @@ function utworzKarte(plik){
       <span class="nazwa"></span>
       <span class="stan">W kolejce...</span>
       <button class="popraw" disabled title="Gumka / przywracanie pędzlem">✏️ Popraw</button>
-      <button class="pobierz" disabled>⬇ PNG</button>
+      <button class="pobierz" disabled>⬇ ${$('#format').value.toUpperCase()}</button>
       <button class="usun" title="Usuń z listy">✕</button>
     </div>
     <div class="obrazy">
@@ -557,16 +575,47 @@ document.addEventListener('keydown', e => {
 function pobierz(z){
   return new Promise(res => {
     if (!z.wynik) return res();
-    z.wynik.toBlob(blob => {
+    const format = $('#format').value, max = +$('#wielkosc').value, jakosc = $('#jakoscPliku').value / 100;
+    const src = z.wynik;
+    let w = src.width, h = src.height;
+    if (max && Math.max(w, h) > max){ const s = max / Math.max(w, h); w = Math.round(w * s); h = Math.round(h * s); }
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    if (format === 'jpg'){                       // JPG nie ma przezroczystości -> wybrane tło albo białe
+      ctx.fillStyle = ustawienia().tlo || '#ffffff'; ctx.fillRect(0, 0, w, h);
+    }
+    ctx.drawImage(src, 0, 0, w, h);
+    const typ = { png: 'image/png', webp: 'image/webp', jpg: 'image/jpeg' }[format];
+    c.toBlob(blob => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = z.nazwa + '_bez_tla.png';
+      a.download = z.nazwa + '_bez_tla.' + format;
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 2000);
       res();
-    }, 'image/png');
+    }, typ, format === 'png' ? undefined : jakosc);
   });
 }
+function opcjeZapisu(){
+  const f = $('#format').value;
+  $('#jakoscPlikuBox').style.display = f === 'png' ? 'none' : '';
+  $('#jakoscPlikuTxt').textContent = $('#jakoscPliku').value + '%';
+  document.querySelectorAll('.pobierz').forEach(b => b.textContent = '⬇ ' + f.toUpperCase());
+  try{
+    localStorage.setItem('usuwanieTla.zapis', JSON.stringify({ f, j: $('#jakoscPliku').value, w: $('#wielkosc').value }));
+  }catch(e){}
+}
+try{
+  const s = JSON.parse(localStorage.getItem('usuwanieTla.zapis') || '{}');
+  if (s.f) $('#format').value = s.f;
+  if (s.j) $('#jakoscPliku').value = s.j;
+  if (s.w) $('#wielkosc').value = s.w;
+}catch(e){}
+$('#format').onchange = opcjeZapisu;
+$('#jakoscPliku').oninput = opcjeZapisu;
+$('#wielkosc').onchange = opcjeZapisu;
+opcjeZapisu();
 function odswiezPrzycisk(){ $('#pobierzWszystkie').disabled = !zdjecia.some(z => z.wynik); }
 $('#pobierzWszystkie').onclick = async () => {
   for (const z of zdjecia){ if (z.wynik){ await pobierz(z); await new Promise(r => setTimeout(r, 400)); } }
