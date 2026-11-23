@@ -443,6 +443,7 @@ function utworzKarte(plik){
     <div class="gora">
       <span class="nazwa"></span>
       <span class="stan">W kolejce...</span>
+      <button class="potnij" title="Arkusz naklejek albo kilka rzeczy na jednym zdjęciu – każda osobno jako nowy obrazek">✂️ Potnij na kawałki</button>
       <button class="popraw" disabled title="Gumka / przywracanie pędzlem">✏️ Popraw</button>
       <button class="pobierz" disabled>⬇ ${$('#format').value.toUpperCase()}</button>
       <button class="usun" title="Usuń z listy">✕</button>
@@ -485,6 +486,7 @@ function utworzKarte(plik){
   z.przyciski = on => { karta.querySelector('.pobierz').disabled = !on; karta.querySelector('.popraw').disabled = !on; };
   karta.querySelector('.pobierz').onclick = () => pobierz(z);
   karta.querySelector('.popraw').onclick = () => otworzEdytor(z);
+  karta.querySelector('.potnij').onclick = () => potnijArkusz(z);
   karta.querySelector('.wynik').onclick = () => { if (z.wynik) otworzEdytor(z); };
   karta.querySelector('.usun').onclick = () => {
     karta.remove(); URL.revokeObjectURL(url);
@@ -553,7 +555,8 @@ function podlaczNarzedzia(z){
 async function przetworz(z){
   if (z.usuniete) return;
   try{
-    const bezAI = $('#bezAI').checked;
+    const wlasna = z.wlasnaMaska;
+    const bezAI = $('#bezAI').checked || !!wlasna;
     if (!bezAI){
       z.stan('Czekam na model...');
       await wczytajModel();
@@ -574,7 +577,8 @@ async function przetworz(z){
       bm.close && bm.close();
     }
     let maska;
-    if (bezAI) maska = new Uint8Array(z.w * z.h).fill(255);
+    if (wlasna && wlasna.length === z.w * z.h) maska = wlasna.slice();
+    else if (bezAI) maska = new Uint8Array(z.w * z.h).fill(255);
     else try{ maska = await liczMaske(z); }
     catch(e){
       if (urzadzenie === 'karta graficzna'){        // karta graficzna nie dała rady -> procesor
@@ -586,7 +590,7 @@ async function przetworz(z){
     z.alfaKlucz = null;
     z.tloKolor = szacujTlo(z);
     rysuj(z);
-    z.stan(bezAI ? 'Gotowe ✔ (bez usuwania tła)' : `Gotowe ✔ (${((performance.now()-t0)/1000).toFixed(1)} s)`, 'ok');
+    z.stan(wlasna ? 'Gotowe ✔ (wycięte z arkusza)' : bezAI ? 'Gotowe ✔ (bez usuwania tła)' : `Gotowe ✔ (${((performance.now()-t0)/1000).toFixed(1)} s)`, 'ok');
     z.przyciski(true);
     z.karta.querySelector('.narzedzia').style.display = '';
     if (folder && $('#autoZapis').checked) await pobierz(z, false);
@@ -596,6 +600,130 @@ async function przetworz(z){
     z.karta.querySelector('.wynik').innerHTML = '❌';
   }
   odswiezPrzycisk();
+}
+
+// ---------- Cięcie arkusza (np. naklejki) na osobne obrazki ----------
+// odległość do najbliższego zaznaczonego piksela (dwa przejścia, przybliżenie)
+function odleglosci(w, h, pole){
+  const n = w * h, d = new Float32Array(n), D = 1.4142;
+  for (let i = 0; i < n; i++) d[i] = pole[i] ? 0 : 1e9;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    const i = y * w + x; let v = d[i]; if (!v) continue;
+    if (x > 0) v = Math.min(v, d[i-1] + 1);
+    if (y > 0){ v = Math.min(v, d[i-w] + 1); if (x > 0) v = Math.min(v, d[i-w-1] + D); if (x < w-1) v = Math.min(v, d[i-w+1] + D); }
+    d[i] = v;
+  }
+  for (let y = h - 1; y >= 0; y--) for (let x = w - 1; x >= 0; x--){
+    const i = y * w + x; let v = d[i]; if (!v) continue;
+    if (x < w-1) v = Math.min(v, d[i+1] + 1);
+    if (y < h-1){ v = Math.min(v, d[i+w] + 1); if (x < w-1) v = Math.min(v, d[i+w+1] + D); if (x > 0) v = Math.min(v, d[i+w-1] + D); }
+    d[i] = v;
+  }
+  return d;
+}
+function srodkowa(t){ t.sort((a, b) => a - b); return t[t.length >> 1]; }
+
+// znajduje osobne rzeczy na jednolitym tle; zwraca kawałki {x,y,w,h,maska}
+function znajdzKawalki(px, w, h){
+  const n = w * h, S = Math.max(w, h);
+  // kolor tła = środkowa wartość z pikseli na brzegu zdjęcia
+  const r = [], g = [], b = [];
+  const krok = Math.max(1, Math.floor((w + h) / 400));
+  const brz = i => { r.push(px[4*i]); g.push(px[4*i+1]); b.push(px[4*i+2]); };
+  for (let x = 0; x < w; x += krok){ brz(x); brz((h-1)*w + x); }
+  for (let y = 0; y < h; y += krok){ brz(y*w); brz(y*w + w-1); }
+  const tr = srodkowa(r), tg = srodkowa(g), tb = srodkowa(b);
+  const pole = new Uint8Array(n);
+  for (let i = 0; i < n; i++){
+    const dd = Math.max(Math.abs(px[4*i]-tr), Math.abs(px[4*i+1]-tg), Math.abs(px[4*i+2]-tb));
+    pole[i] = dd > 60 && px[4*i+3] > 20 ? 1 : 0;
+  }
+  const R1 = Math.max(1, Math.round(S * 0.0013));       // sklejanie drobnych części jednej rzeczy
+  const R2 = Math.max(R1 + 3, Math.round(S * 0.008));  // szerokość ramki wokół (jak biały brzeg naklejki)
+  const dist = odleglosci(w, h, pole);
+  const zl = new Uint8Array(n);
+  for (let i = 0; i < n; i++) zl[i] = dist[i] <= R1 ? 1 : 0;
+  const k = kawalki(w, h, zl, true);
+  const ile = k.rozm.length;
+  const x0 = new Int32Array(ile).fill(w), y0 = new Int32Array(ile).fill(h), x1 = new Int32Array(ile).fill(-1), y1 = new Int32Array(ile).fill(-1);
+  for (let i = 0; i < n; i++){
+    const l = k.lab[i]; if (!l) continue;
+    const x = i % w, y = (i - x) / w;
+    if (x < x0[l]) x0[l] = x; if (x > x1[l]) x1[l] = x; if (y < y0[l]) y0[l] = y; if (y > y1[l]) y1[l] = y;
+  }
+  let naj = 0; for (let l = 1; l < ile; l++) naj = Math.max(naj, k.rozm[l]);
+  const duze = [];
+  for (let l = 1; l < ile; l++) if (k.rozm[l] >= naj * 0.08 && k.rozm[l] >= n * 0.002) duze.push(l);
+  // małe kawałki doklej do dużego, w którego ramce leżą; resztę pomiń (kurz, kropki)
+  const grupa = new Int32Array(ile);
+  for (const l of duze) grupa[l] = l;
+  for (let l = 1; l < ile; l++){
+    if (grupa[l]) continue;
+    const cx = (x0[l] + x1[l]) / 2, cy = (y0[l] + y1[l]) / 2;
+    for (const d of duze) if (cx >= x0[d] - R2 && cx <= x1[d] + R2 && cy >= y0[d] - R2 && cy <= y1[d] + R2){ grupa[l] = d; break; }
+  }
+  for (let l = 1; l < ile; l++){ const d = grupa[l]; if (d && d !== l){
+    x0[d] = Math.min(x0[d], x0[l]); y0[d] = Math.min(y0[d], y0[l]); x1[d] = Math.max(x1[d], x1[l]); y1[d] = Math.max(y1[d], y1[l]); } }
+  const wynik = [];
+  for (const d of duze){
+    const m = R2 - R1 + 2;
+    const X = Math.max(0, x0[d] - m), Y = Math.max(0, y0[d] - m);
+    const W = Math.min(w - 1, x1[d] + m) - X + 1, H = Math.min(h - 1, y1[d] + m) - Y + 1;
+    const wn = new Uint8Array(W * H);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++){ const l = k.lab[(Y + y) * w + X + x]; if (l && grupa[l] === d) wn[y * W + x] = 1; }
+    // dziury w środku (białe oczy, zęby…) też należą do rzeczy
+    const zew = new Uint8Array(W * H); for (let i = 0; i < W * H; i++) zew[i] = wn[i] ? 0 : 1;
+    const kz = kawalki(W, H, zew, false);
+    for (let i = 0; i < W * H; i++){ const l = kz.lab[i]; if (l && !kz.brzeg[l]) wn[i] = 1; }
+    const dl = odleglosci(W, H, wn), maska = new Uint8Array(W * H), gr = R2 - R1 + 0.5;
+    for (let i = 0; i < W * H; i++){ const v = (gr - dl[i]) * 255; maska[i] = v <= 0 ? 0 : v >= 255 ? 255 : v; }
+    wynik.push({ x: X, y: Y, w: W, h: H, maska, cx: X + W / 2, cy: Y + H / 2 });
+  }
+  // kolejność jak przy czytaniu: rzędami od góry, w rzędzie od lewej
+  wynik.sort((a, b) => a.cy - b.cy);
+  const rzedy = [];
+  for (const p of wynik){
+    const rz = rzedy.find(r => p.cy > r.y && p.cy < r.y + r.h);
+    if (rz) rz.el.push(p); else rzedy.push({ y: p.y, h: p.h, el: [p] });
+  }
+  return rzedy.flatMap(r => r.el.sort((a, b) => a.cx - b.cx));
+}
+
+async function potnijArkusz(z){
+  const btn = z.karta.querySelector('.potnij');
+  btn.disabled = true; btn.textContent = '✂️ Szukam...';
+  try{
+    await new Promise(r => setTimeout(r, 30));
+    const bm = await createImageBitmap(z.plik);
+    const w = bm.width, h = bm.height;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(bm, 0, 0); bm.close && bm.close();
+    const px = ctx.getImageData(0, 0, w, h).data;
+    const czesci = znajdzKawalki(px, w, h);
+    if (czesci.length < 2){
+      ustawStatus('Nie znalazłem kilku osobnych rzeczy. Tło musi być jednolite (np. białe), a rzeczy nie mogą się stykać.', 'blad');
+      return;
+    }
+    const cc = document.createElement('canvas'), cx = cc.getContext('2d');
+    for (let i = 0; i < czesci.length; i++){
+      const p = czesci[i];
+      cc.width = p.w; cc.height = p.h;
+      cx.drawImage(c, p.x, p.y, p.w, p.h, 0, 0, p.w, p.h);
+      const blob = await new Promise(r => cc.toBlob(r, 'image/png'));
+      const plik = new File([blob], `${z.nazwa}_${String(i + 1).padStart(2, '0')}.png`, { type: 'image/png' });
+      const nz = utworzKarte(plik);
+      nz.limit = 0; nz.wlasnaMaska = p.maska;
+      zdjecia.push(nz);
+      doKolejki(nz);
+    }
+    ustawStatus(`✂️ Pocięte: ${czesci.length} kawałków – są na liście poniżej.`);
+    czesci.length && zdjecia[zdjecia.length - czesci.length].karta.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }catch(e){
+    console.error(e); ustawStatus('Błąd cięcia: ' + e.message, 'blad');
+  }finally{
+    btn.disabled = false; btn.textContent = '✂️ Potnij na kawałki';
+  }
 }
 
 // ---------- Czyszczenie maski ----------
@@ -803,6 +931,7 @@ const odwrotnosc = { cw: 'ccw', ccw: 'cw', fx: 'fx', fy: 'fy' };
 function wykonajOp(z, op, zapisz = true){
   z.oryg = przeksztalc(z.oryg, z.w, z.h, 4, op);
   z.maska = przeksztalc(z.maska, z.w, z.h, 1, op);
+  if (z.wlasnaMaska) z.wlasnaMaska = przeksztalc(z.wlasnaMaska, z.w, z.h, 1, op);
   z.reczne = przeksztalc(z.reczne, z.w, z.h, 1, op);
   if (op === 'cw' || op === 'ccw'){ const t = z.w; z.w = z.h; z.h = t; }
   z.alfaKlucz = null;
