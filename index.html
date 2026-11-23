@@ -1284,7 +1284,7 @@ async function zrobIco(src){
 }
 
 // komplet ikon do stron (GitHub Pages, ESP): kwadrat z obiektem na srodku, tlo z ustawien
-async function zrobKompletIkon(src){
+async function zrobKompletIkon(src, surowe = false){
   const u = ustawienia(), bok = Math.max(src.width, src.height), marg = Math.round(bok * 0.08);
   const kw = document.createElement('canvas'); kw.width = kw.height = bok + 2 * marg;
   const k = kw.getContext('2d');
@@ -1307,7 +1307,7 @@ async function zrobKompletIkon(src){
       'Wgraj pliki obok index.html. W <head> strony:\r\n' +
       '<link rel="icon" href="favicon.ico">\r\n<link rel="apple-touch-icon" href="apple-touch-icon.png">\r\n<link rel="manifest" href="manifest.json">\r\n')]
   ];
-  return zrobZip(pliki);
+  return surowe ? pliki : zrobZip(pliki);
 }
 // prosty ZIP (bez kompresji - PNG i tak sa skompresowane)
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -1423,8 +1423,36 @@ async function wolnaNazwa(nazwa){
 // prosic = czy wolno zapytać o dostęp (tylko po kliknięciu)
 async function pobierz(z, prosic = true){
   if (!z.wynik) return;
+  try{ await pobierz0(z, prosic); }
+  catch(e){
+    console.error(e);
+    if (folder){                       // folder nie przyjął pliku -> zwykłe pobieranie
+      try{ const { blob, nazwa } = await zrobPlik(z); await zapiszBlobZwykle(blob, nazwa); z.stan('⬇ Pobrano (folder nie przyjął pliku): ' + nazwa, 'ok'); return; }
+      catch(e2){ console.error(e2); }
+    }
+    z.stan('Błąd zapisu: ' + e.message, 'blad');
+  }
+}
+function zapiszBlobZwykle(blob, nazwa){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nazwa; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function pobierz0(z, prosic){
   if (folder){
     if (!(await dostepDoFolderu(prosic))){ z.stan('Kliknij „Zapisz”, żeby pozwolić na zapis do folderu', 'blad'); return; }
+    if ($('#format').value === 'ikony'){       // komplet ikon -> od razu jako pliki w podfolderze (bez ZIP-a)
+      const src = z.wynikBez || z.wynik;
+      const pliki = await zrobKompletIkon(src, true);
+      const nazwaF = (z.nazwa + '_ikony').replace(/[\\/:*?"<>|]/g, '_');
+      const pod = await folder.getDirectoryHandle(nazwaF, { create: true });
+      for (const [n, dane] of pliki){
+        const fh = await pod.getFileHandle(n, { create: true });
+        const w = await fh.createWritable(); await w.write(dane); await w.close();
+      }
+      z.stan('💾 Zapisano ikony w folderze: ' + nazwaF, 'ok');
+      return;
+    }
     const { blob, nazwa } = await zrobPlik(z);
     // to samo zdjęcie zapisane drugi raz w tym samym formacie -> nadpisz zamiast robić kopię
     const cel = (z.zapisanoJako && z.zapisanoJako.endsWith(nazwa.slice(nazwa.lastIndexOf('.')))) ? z.zapisanoJako : await wolnaNazwa(nazwa);
@@ -1468,7 +1496,7 @@ function odswiezPrzycisk(){ $('#pobierzWszystkie').disabled = !zdjecia.some(z =>
 $('#pobierzWszystkie').onclick = async () => {
   if (folder && !(await dostepDoFolderu(true))) return;
   for (const z of zdjecia){
-    if (z.wynik){ await pobierz(z, false); if (!folder) await new Promise(r => setTimeout(r, 400)); }
+    if (z.wynik){ await pobierz(z, false); if (!folder) await new Promise(r => setTimeout(r, 600)); }
   }
 };
 $('#wyczysc').onclick = () => { [...zdjecia].forEach(z => z.karta.querySelector('.usun').click()); };
