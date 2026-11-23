@@ -69,6 +69,10 @@
 
   #lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(760px,1fr));gap:22px}
   .karta{background:var(--karta);border:1.5px solid var(--ramka);border-radius:20px;padding:16px;box-shadow:var(--cien)}
+  .podpisBox{display:flex;align-items:center;gap:6px;margin-top:10px;white-space:nowrap}
+  .podpisBox input[type=text]{flex:1;min-width:0;padding:6px 8px;border-radius:8px;border:1px solid #c7c2d6;font:inherit}
+  .podpisOpcje{display:flex;gap:6px;margin-top:6px}
+  .podpisOpcje select{flex:1;min-width:0}
   .gora{display:flex;align-items:center;gap:10px;margin-bottom:14px}
   .nazwa{font-weight:700;font-size:18px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .stan{font-size:15px;color:var(--szary);font-weight:600}
@@ -216,6 +220,19 @@
         <option value="800">max 800 px</option>
         <option value="500">max 500 px</option>
       </select>
+      <label class="podpisBox" title="Napis w rogu zdjęcia – odznacz, jeśli ma go nie być"><input type="checkbox" id="podpis"> ✍️ podpis <input type="text" id="podpisTekst" value="autor Adam Bryks" maxlength="60"></label>
+      <div class="podpisOpcje">
+        <select id="podpisGdzie" title="Gdzie napis">
+          <option value="pd">↘ prawy dół</option><option value="ld">↙ lewy dół</option><option value="sd">⬇ środek dół</option>
+          <option value="pg">↗ prawa góra</option><option value="lg">↖ lewa góra</option>
+        </select>
+        <select id="podpisWielkosc" title="Wielkość napisu">
+          <option value="0.03">mały</option><option value="0.045" selected>średni</option><option value="0.065">duży</option>
+        </select>
+        <select id="podpisKolor" title="Kolor napisu">
+          <option value="b">biały</option><option value="c">czarny</option>
+        </select>
+      </div>
     </div>
     <div class="panel akcje" style="--k:#f43f5e">
       <h3>🚀 Gotowe zdjęcia</h3>
@@ -327,7 +344,9 @@ function zapiszUstawienia(){
       poswiata: $('#poswiata').checked, kolor: $('#kolor').value, margines: $('#margines').value,
       cien: $('#cien').value, sila: $('#sila').value, autoZapis: $('#autoZapis').checked, wczytaj: $('#wczytaj').value,
       kier: document.querySelector('input[name=kier]:checked').value, dlugosc: $('#dlugosc').value,
-      g1: $('#grad1').value, g2: $('#grad2').value, gk: $('#gradKier').value
+      g1: $('#grad1').value, g2: $('#grad2').value, gk: $('#gradKier').value,
+      pd: $('#podpis').checked, pt: $('#podpisTekst').value, pg: $('#podpisGdzie').value,
+      pw: $('#podpisWielkosc').value, pk: $('#podpisKolor').value
     }));
   }catch(e){}
 }
@@ -348,6 +367,11 @@ try{
   if (s.g1) $('#grad1').value = s.g1;
   if (s.g2) $('#grad2').value = s.g2;
   if (s.gk) $('#gradKier').value = s.gk;
+  if (s.pd != null) $('#podpis').checked = s.pd;
+  if (s.pt) $('#podpisTekst').value = s.pt;
+  if (s.pg) $('#podpisGdzie').value = s.pg;
+  if (s.pw) $('#podpisWielkosc').value = s.pw;
+  if (s.pk) $('#podpisKolor').value = s.pk;
 }catch(e){}
 function opisySuwakow(){
   $('#czyscTxt').textContent = $('#czysc').value;
@@ -1023,6 +1047,32 @@ function skladaj(p, tlo, sx, sy, sw, sh){
   return out;
 }
 
+// napis „autor …” w rogu (tylko gdy zaznaczony)
+function zPodpisem(src){
+  const tekst = $('#podpisTekst').value.trim();
+  if (!$('#podpis').checked || !tekst) return src;
+  const w = src.width, h = src.height;
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const o = c.getContext('2d');
+  o.drawImage(src, 0, 0);
+  let px = Math.max(12, Math.round(Math.min(w, h) * +$('#podpisWielkosc').value));
+  o.font = `bold ${px}px "Segoe UI", Arial, sans-serif`;
+  let tw = o.measureText(tekst).width;
+  const m = Math.round(px * 0.6);
+  if (tw > w - 2 * m){ px = Math.max(8, Math.floor(px * (w - 2 * m) / tw)); o.font = `bold ${px}px "Segoe UI", Arial, sans-serif`; tw = o.measureText(tekst).width; }
+  const g = $('#podpisGdzie').value;
+  const x = g[0] === 'l' ? m : g[0] === 's' ? (w - tw) / 2 : w - m - tw;
+  const y = g[1] === 'g' ? m + px * 0.8 : h - m;
+  const bialy = $('#podpisKolor').value === 'b';
+  o.lineJoin = 'round';
+  o.lineWidth = Math.max(2, px * 0.14);
+  o.strokeStyle = bialy ? 'rgba(0,0,0,.65)' : 'rgba(255,255,255,.75)';
+  o.strokeText(tekst, x, y);
+  o.fillStyle = bialy ? '#ffffff' : '#1a1a1a';
+  o.fillText(tekst, x, y);
+  return c;
+}
+
 function rysuj(z){
   if (!z.maska) return;
   const u = ustawienia(), p = przygotuj(z, u), { w, h } = p;
@@ -1034,7 +1084,8 @@ function rysuj(z){
     if (!p.cienie.length){ sx = Math.max(0, sx); sy = Math.max(0, sy); px = Math.min(w, px); py = Math.min(h, py); }  // przy cieniu wolno wyjść poza zdjęcie
     sw = px - sx; sh = py - sy;
   }
-  z.wynik = skladaj(p, u.tlo, sx, sy, sw, sh);
+  z.wynikBez = skladaj(p, u.tlo, sx, sy, sw, sh);
+  z.wynik = zPodpisem(z.wynikBez);
   const pole = z.karta.querySelector('.wynik');
   pole.innerHTML = ''; pole.appendChild(z.wynik);
   if (z.porownaj){
@@ -1286,7 +1337,7 @@ function zrobZip(pliki){
 }
 async function zrobPlik(z){
   const format = $('#format').value, max = +$('#wielkosc').value, jakosc = $('#jakoscPliku').value / 100;
-  const src = z.wynik;
+  const src = (format === 'ico' || format === 'ikony') ? (z.wynikBez || z.wynik) : z.wynik;   // ikony bez napisu (za małe)
   let blob;
   if (format === 'ico'){
     blob = await zrobIco(src);
@@ -1723,6 +1774,8 @@ document.querySelector('input[name=tlo][value=obraz]').addEventListener('change'
 ['#czysc', '#drobne', '#margines'].forEach(s => $(s).oninput = rysujWszystkie);
 ['#poswiata', '#przytnij', '#cien'].forEach(s => $(s).onchange = rysujWszystkie);
 $('#sila').oninput = rysujWszystkie;
+['#podpis', '#podpisGdzie', '#podpisWielkosc', '#podpisKolor'].forEach(s => $(s).addEventListener('change', () => { zapiszUstawienia(); rysujWszystkie(); }));
+$('#podpisTekst').addEventListener('input', () => { $('#podpis').checked = true; zapiszUstawienia(); rysujWszystkie(); });
 $('#dlugosc').oninput = rysujWszystkie;
 document.querySelectorAll('input[name=kier]').forEach(r => r.onchange = rysujWszystkie);
 $('#autoZapis').onchange = zapiszUstawienia;
