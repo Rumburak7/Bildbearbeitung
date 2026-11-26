@@ -36,6 +36,19 @@
   #motyw:hover{background:rgba(255,255,255,.32)}
   main{max-width:1700px;margin:0 auto;padding:28px 36px}
 
+  #gora{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px;align-items:stretch}
+  @media (max-width:1100px){ #gora{grid-template-columns:1fr} }
+  #presety{border-radius:20px;padding:14px 16px;background:var(--karta);border:1.5px solid var(--ramka);box-shadow:var(--cien);display:flex;flex-direction:column;gap:10px}
+  .presTytul{font-weight:700;font-size:17px} .presTytul small{font-weight:400;margin-left:6px}
+  #presLista{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;flex:1}
+  .pres{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:92px;padding:10px 6px;border-radius:14px;
+        border:2px solid var(--ramka);background:var(--pole);cursor:pointer;text-align:center;font-size:15px;line-height:1.2;transition:.12s;color:var(--tekst)}
+  .pres:hover{border-color:var(--akcent);transform:translateY(-1px)}
+  .pres.pusty{border-style:dashed;color:var(--szary)}
+  .pres.aktywny{border-color:var(--akcent);background:var(--wcisn);box-shadow:0 0 0 3px color-mix(in srgb,var(--akcent) 25%,transparent)}
+  .pres .em{font-size:26px} .pres .nazwa{font-weight:600;word-break:break-word}
+  .pres .zap{position:absolute;top:3px;right:4px;font-size:14px;padding:2px 5px;border-radius:8px;border:none;background:transparent;opacity:.65}
+  .pres .zap:hover{opacity:1;background:var(--hover);transform:none}
   #drop{border:3px dashed var(--przerywana);border-radius:20px;padding:40px;text-align:center;font-size:21px;color:var(--szary);transition:.15s;cursor:pointer;
         background:linear-gradient(135deg,color-mix(in srgb,#8b5cf6 var(--tint),var(--karta)),color-mix(in srgb,#ec4899 var(--tint),var(--karta)) 50%,color-mix(in srgb,#f59e0b var(--tint),var(--karta)))}
   #drop::before{content:"🖼️";display:block;font-size:52px;margin-bottom:8px}
@@ -144,10 +157,16 @@
 </header>
 
 <main>
+  <div id="gora">
   <section id="drop">
     <b>Przeciągnij zdjęcia tutaj</b>, kliknij, żeby je wybrać, albo wklej obrazek (Strg+V)
     <input type="file" id="plik" accept="image/*" multiple hidden>
   </section>
+  <section id="presety" title="Moje ustawienia: kliknij = wczytaj, 💾 = zapisz to, co jest teraz ustawione">
+    <div class="presTytul">⭐ Moje ustawienia <small>kliknij = wczytaj · 💾 = zapisz obecne</small></div>
+    <div id="presLista"></div>
+  </section>
+  </div>
 
   <section id="opcje">
     <div class="panel" style="--k:#8b5cf6">
@@ -1753,6 +1772,64 @@ async function zapiszKolaz(jpg){
   $('#kStan').textContent = await zapiszBlob(blob, nazwa);
 }
 $('#kZapiszPng').onclick = () => zapiszKolaz(false);
+
+// ---------- ⭐ Moje ustawienia (5 przycisków z zapamiętanymi ustawieniami) ----------
+const PRES = 'usuwanieTla.presety', PRES_N = 5, PRES_EMOJI = ['⭐', '🧩', '🖼', '🏷', '🎨'];
+let presety = []; try { presety = JSON.parse(localStorage.getItem(PRES) || '[]'); } catch(e) {}
+let presAktywny = -1; try { presAktywny = +(localStorage.getItem(PRES + '.akt') ?? -1); } catch(e) {}
+function presPola(){ return [...document.querySelectorAll('#opcje input, #opcje select')].filter(e => e.type !== 'file' && (e.id || e.type === 'radio')); }
+function presZbierz(){
+  const d = {};
+  for (const e of presPola()){
+    if (e.type === 'radio'){ if (e.checked) d['r:' + e.name] = e.value; }
+    else d[e.id] = e.type === 'checkbox' ? e.checked : e.value;
+  }
+  return d;
+}
+function presWczytaj(i){
+  const p = presety[i]; if (!p) return;
+  const przedAI = $('#jakosc').value + '|' + $('#bezAI').checked;
+  for (const [k, v] of Object.entries(p.d)){
+    if (k.startsWith('r:')){ const r = document.querySelector(`input[name="${k.slice(2)}"][value="${v}"]`); if (r) r.checked = true; continue; }
+    const e = document.getElementById(k); if (!e) continue;
+    if (e.type === 'checkbox') e.checked = v; else e.value = v;
+  }
+  presAktywny = i; try { localStorage.setItem(PRES + '.akt', i); } catch(e) {}
+  opcjeZapisu(); rysujWszystkie();
+  if ($('#jakosc').value + '|' + $('#bezAI').checked !== przedAI) $('#jakosc').onchange();   // inny model -> policz od nowa
+  presRysuj();
+  ustawStatus('Wczytano ustawienia: ' + p.n, 'ok');
+}
+function presZapisz(i){
+  const stara = presety[i] ? presety[i].n : '';
+  const n = prompt('Nazwa tych ustawień (np. „Naklejki”, „Kafelek Chrome”, „Wydruki 3D”):', stara || ('Moje ' + (i + 1)));
+  if (n === null) return;
+  presety[i] = { n: n.trim().slice(0, 24) || ('Moje ' + (i + 1)), d: presZbierz() };
+  try { localStorage.setItem(PRES, JSON.stringify(presety)); } catch(e) {}
+  presAktywny = i; try { localStorage.setItem(PRES + '.akt', i); } catch(e) {}
+  presRysuj();
+  ustawStatus('Zapisano ustawienia: ' + presety[i].n, 'ok');
+}
+function presRysuj(){
+  const l = $('#presLista'); l.innerHTML = '';
+  for (let i = 0; i < PRES_N; i++){
+    const p = presety[i], b = document.createElement('div');
+    b.className = 'pres' + (p ? '' : ' pusty') + (p && i === presAktywny ? ' aktywny' : '');
+    if (p){
+      b.innerHTML = `<span class="em">${PRES_EMOJI[i]}</span><span class="nazwa"></span><button class="zap" title="Zapisz tu to, co jest teraz ustawione (nadpisze)">💾</button>`;
+      b.querySelector('.nazwa').textContent = p.n;
+      b.onclick = () => presWczytaj(i);
+      b.querySelector('.zap').onclick = (e) => { e.stopPropagation(); presZapisz(i); };
+      b.title = 'Kliknij: wczytaj „' + p.n + '”';
+    } else {
+      b.innerHTML = '<span class="em">＋</span><span>zapisz obecne</span>';
+      b.onclick = () => presZapisz(i);
+      b.title = 'Zapisz tu to, co jest teraz ustawione';
+    }
+    l.appendChild(b);
+  }
+}
+presRysuj();
 $('#kZapiszJpg').onclick = () => zapiszKolaz(true);
 $('#pobierzWszystkie').onclick = async () => {
   if (folder && !(await dostepDoFolderu(true))) return;
